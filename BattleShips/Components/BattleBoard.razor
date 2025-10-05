@@ -1,0 +1,60 @@
+@using BattleShips.Domain
+
+<div class="board-frame">
+    <div class="grid @(Interactable ? "" : "grid--disabled")" style="--size:@Board.Size; --cell:34px">
+        @for (int r = 0; r < Board.Size; r++)
+        {
+            for (int c = 0; c < Board.Size; c++)
+            {
+                var rr = r; var cc = c;                 // capture fix
+
+                var cell = Board[rr, cc];
+                var css = CellCss(cell, Own);
+                var text = CellText(cell, Own);
+
+                <CellView CssClass="@css"
+                          Text="@text"
+                          OnClick="@(() => Click(rr, cc))" />
+            }
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public Board Board { get; set; } = default!;
+    [Parameter] public bool Own { get; set; }
+    [Parameter] public bool Interactable { get; set; } = true;
+    [Parameter] public Func<Position, Task>? OnFire { get; set; }
+
+    private Task Click(int r, int c)
+    {
+        if (!Interactable || Own || OnFire is null) return Task.CompletedTask;
+
+        // ⛔ block re-clicking a tried cell (hit/miss/sunk)
+        if (Board[r, c].IsRevealed) return Task.CompletedTask;
+
+        return OnFire(new Position(r, c));
+    }
+
+    private static string CellCss(Cell cell, bool own)
+    {
+        var baseCls = "grid-cell";
+        return cell.Status switch
+        {
+            CellStatus.Hit  => $"{baseCls} hit",
+            CellStatus.Miss => $"{baseCls} miss",
+            CellStatus.Sunk => $"{baseCls} sunk",
+            CellStatus.Ship when own => $"{baseCls} ship",
+            _ => baseCls
+        };
+    }
+
+    private static string CellText(Cell cell, bool own) => cell.Status switch
+    {
+        CellStatus.Hit  => "✖",
+        CellStatus.Miss => "•",
+        CellStatus.Sunk => "☒",
+        CellStatus.Ship when own => "■",
+        _ => ""
+    };
+}

@@ -1,0 +1,50 @@
+@using BattleShips.Domain
+@using BattleShips.Domain.Ships
+
+<div class="grid" style="--size:@Board.Size; --cell:34px">
+    @for (int r = 0; r < Board.Size; r++)
+    {
+        for (int c = 0; c < Board.Size; c++)
+        {
+            // IMPORTANT: capture copies for the lambda
+            var rr = r;
+            var cc = c;
+
+            var cell = Board[rr, cc];
+            var css = cell.Status == CellStatus.Ship ? "grid-cell ship" : "grid-cell";
+            var text = cell.Status == CellStatus.Ship ? "■" : string.Empty;
+
+            <CellView CssClass="@css"
+                      Text="@text"
+                      OnClick="@(() => Click(rr, cc))" />
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public Board Board { get; set; } = default!;
+    private ShipBase? _last;
+
+    private void Click(int r, int c)
+    {
+        var p = new Position(r, c);
+        if (_last is null)
+        {
+            _last = new Destroyer(p, Orientation.Horizontal);
+            if (!Board.Place(_last)) _last = null;
+            return;
+        }
+
+        Board.Remove(_last);
+        var newO = _last.Orientation == Orientation.Horizontal ? Orientation.Vertical : Orientation.Horizontal;
+        _last.Reposition(_last.Start, newO);
+
+        if (!Board.Place(_last))
+        {
+            var back = newO == Orientation.Horizontal ? Orientation.Vertical : Orientation.Horizontal;
+            _last.Reposition(_last.Start, back);
+            Board.Place(_last);
+        }
+        _last = null;
+    }
+}

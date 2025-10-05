@@ -1,0 +1,219 @@
+@page "/"
+@rendermode InteractiveServer
+@using BattleShips.Domain
+@inject BattleShips.Services.GameService Game
+@inject NavigationManager Nav
+
+<h3 class="mb-3">Battleships</h3>
+
+@if (Game.Session is null)
+{
+    <!-- SESSION CREATION UI -->
+    <div class="card mb-3">
+        <div class="card-body d-flex align-items-center gap-3 flex-wrap">
+            <label class="form-label mb-0">Opponent:</label>
+            <select class="form-select w-auto" @bind="_opponent">
+                <option value="Bot">Bot (local AI)</option>
+                <option value="Human">Real person (online)</option>
+            </select>
+
+            <label class="form-label mb-0 ms-3">Board size:</label>
+            <select class="form-select w-auto" @bind="_size">
+                @foreach (var s in _sizes)
+                {
+                    <option value="@s">@s×@s</option>
+                }
+            </select>
+
+            <button class="btn btn-primary ms-2" @onclick="CreateGame">Create game</button>
+        </div>
+    </div>
+
+    @if (_opponent == OpponentKind.Human && _inviteUrl is not null)
+    {
+        <div class="alert alert-info">
+            <strong>Generating session URL…</strong><br />
+            (placeholder — SignalR/Azure not wired yet)<br />
+            Invite link: <code>@_inviteUrl</code>
+        </div>
+    }
+}
+else
+{
+    <!-- STATUS BAR -->
+    <div class="mb-2">
+        <strong>Phase:</strong> @Game.Session.Phase
+        @if (Game.Session.Phase == Phase.Playing)
+        {
+            <span class="ms-3"><strong>Turn:</strong> @Game.Session.Current.Name</span>
+        }
+        @if (Game.Session.Phase == Phase.Finished)
+        {
+            <span class="ms-3"><strong>Winner:</strong> @(Game.Session.Winner?.Name ?? "Draw")</span>
+        }
+    </div>
+
+    <!-- PREPARATION -->
+    @if (Game.Session.Phase == Phase.Preparation)
+    {
+        <div class="row g-3">
+            <div class="col-md-6">
+                <h5>You — place fleet</h5>
+                <PlacementBoard Board="@Game.Session.P1.Board" />
+                <div class="mt-2">
+                    <button class="btn btn-secondary me-2" @onclick="() => Game.RandomizeFor(Game.Session.P1)">Randomize</button>
+                    <button class="btn btn-outline-secondary" @onclick="Game.ResetShips">Reset ships</button>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                @if (_opponent == OpponentKind.Bot)
+                {
+                    <h5>Enemy (bot)</h5>
+                    <div class="alert alert-info">Bot fleet is ready (hidden).</div>
+                    <button class="btn btn-secondary" @onclick="() => Game.RandomizeFor(Game.Session.P2)">Re-roll bot fleet</button>
+                }
+                else
+                {
+                    <h5>Opponent (remote)</h5>
+                    <div class="alert alert-info">
+                        Multiplayer placeholder — remote player will place their fleet here.
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="mt-3 d-flex align-items-center gap-2">
+            <label class="me-2">Shoot mode:</label>
+            <select class="form-select w-auto" @onchange="OnShotsChanged">
+                <option value="1">Normal (1 per turn)</option>
+                <option value="2">Shoot differently (2 per turn)</option>
+            </select>
+
+            <button class="btn btn-success ms-3" @onclick="StartGame" disabled="@(!_canStart)">Play</button>
+            <small class="text-muted ms-2">@_startHint</small>
+        </div>
+    }
+
+    else if (Game.Session.Phase == Phase.Playing)
+    {
+        var canShoot = ReferenceEquals(Game.Session.Current, Game.Session.P1);
+
+        <div class="row g-3">
+            <div class="col-md-6">
+                <h5>You</h5>
+                <BattleBoard Board="@Game.Session.P1.Board" Own="true" Interactable="false" OnFire="null" />
+            </div>
+            <div class="col-md-6">
+                <h5>Enemy (@(_opponent == OpponentKind.Bot ? "bot" : "remote"))</h5>
+                @if (_opponent == OpponentKind.Bot)
+                {
+                    <BattleBoard Board="@Game.Session.P2.Board"
+                                 Own="false"
+                                 Interactable="@canShoot"
+                                 OnFire="OnFireAtEnemy" />
+                    @if (!canShoot)
+                    {
+                        <small class="text-muted">Wait for your turn…</small>
+                    }
+                }
+                else
+                {
+                    <div class="alert alert-info">
+                        Multiplayer placeholder — clicking is disabled until SignalR is implemented.
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- ACTIONS -->
+        <ControlsBar
+            OnSurrender="() => Game.Surrender(Game.Session.P1)"
+            OnRequestDraw="() => Game.ProposeDraw(Game.Session.P1)"
+            OnAcceptDraw="() => Game.AcceptDraw(Game.Session.P1)" />
+
+        <div class="mt-3">
+            <strong>Last shot:</strong> @_last
+        </div>
+    }
+    else if (Game.Session.Phase == Phase.Finished)
+    {
+        <h5>Winner: @(Game.Session.Winner?.Name ?? "Draw")</h5>
+        <button class="btn btn-primary" @onclick="() => Game.ResetShips()">New game</button>
+    }
+}
+
+@code {
+    private enum OpponentKind { Bot, Human }
+
+    private OpponentKind _opponent = OpponentKind.Bot;
+    private int _size = 10;
+    private readonly int[] _sizes = new[] { 8, 10, 12 };
+
+    private string? _inviteUrl;
+    private string _last = "—";
+    private bool _canStart;
+    private string _startHint = "Randomize your fleet. Bot fleet is hidden.";
+
+    private void CreateGame()
+    {
+        _inviteUrl = null;
+
+        if (_opponent == OpponentKind.Bot)
+        {
+            Game.NewLocalSession(_size, enemyIsAi: true);
+            if (Game.Session is not null)
+            {
+                Game.RandomizeFor(Game.Session.P1);
+                Game.RandomizeFor(Game.Session.P2);
+                _canStart = true;
+                _startHint = "Ready. Press Play.";
+            }
+        }
+        else
+        {
+            // Placeholder: don't create local session; show a fake invite URL
+            var code = Guid.NewGuid().ToString("N")[..8];
+            _inviteUrl = $"{Nav.BaseUri}join/{code}";
+        }
+    }
+
+    private void StartGame()
+    {
+        if (Game.Start())
+            StateHasChanged();
+        else
+            _startHint = "Both fleets must be complete and valid (no touching).";
+    }
+
+    private void OnShotsChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var n))
+            Game.SetShotsPerTurn(n);
+    }
+
+    private async Task OnFireAtEnemy(Position p)
+    {
+        if (Game.Session is null || Game.Session.Phase != Phase.Playing) return;
+
+        var result = Game.FireAt(p);     // applies your shot, may trigger AI reply
+        _last = $"{p}: {result}";
+        StateHasChanged();               // show ✖ / • / ☒ immediately
+
+        // optional brief pause so you notice the enemy turn when you miss
+        if (result is ShotResult.Miss or ShotResult.Invalid or ShotResult.AlreadyTried)
+        {
+            await Task.Delay(250);
+            StateHasChanged();
+        }
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (Game.Session is not null && Game.Session.Phase == Phase.Preparation)
+        {
+            _canStart = Game.Session.P1.Board.Ships.Count > 0 &&
+                        Game.Session.P2.Board.Ships.Count > 0;
+        }
+    }
+}

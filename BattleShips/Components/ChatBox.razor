@@ -1,0 +1,33 @@
+@using BattleShips.Services
+@inject ChatService Chat
+@implements IDisposable
+
+<div class="card">
+    <div class="card-header">Chat</div>
+    <div class="card-body" style="max-height:200px;overflow:auto">
+        @foreach (var m in Chat.Messages)
+        {
+            <div><strong>@m.Sender:</strong> @m.Text
+                <small class="text-muted">(@m.Timestamp.ToShortTimeString())</small>
+            </div>
+        }
+    </div>
+    <div class="card-footer d-flex gap-2">
+        <input class="form-control" @bind="text" @bind:event="oninput" placeholder="Type message..." />
+        <button class="btn btn-primary" @onclick="Send">Send</button>
+    </div>
+</div>
+
+@code {
+    private string text = string.Empty;
+
+    protected override void OnInitialized() => Chat.Updated += StateHasChanged;
+    public void Dispose() => Chat.Updated -= StateHasChanged;
+
+    private void Send()
+    {
+        if (string.IsNullOrWhiteSpace(text)) return;
+        Chat.Send("Player 1", text);
+        text = string.Empty;
+    }
+}

@@ -1,0 +1,11 @@
+<div class="mt-3 d-flex gap-2">
+    <button class="btn btn-outline-danger" @onclick="OnSurrender">Surrender</button>
+    <button class="btn btn-outline-secondary" @onclick="OnRequestDraw">Request Draw</button>
+    <button class="btn btn-success" @onclick="OnAcceptDraw">Accept Draw</button>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnSurrender { get; set; }
+    [Parameter] public EventCallback OnRequestDraw { get; set; }
+    [Parameter] public EventCallback OnAcceptDraw { get; set; }
+}
