@@ -225,14 +225,6 @@
     </div>
 
     <div class="settings-panel mt-3">
-        <div class="settings-row">
-            <span class="settings-label">Shoot Mode:</span>
-            <select class="custom-select" @onchange="OnShootingModeChanged">
-                <option value="Single">Normal (1 per turn)</option>
-                <option value="Salvo2">Salvo (2 per turn)</option>
-                <option value="Salvo3x3">3x3 Area Shot</option>
-            </select>
-        </div>
         <div style="text-align: center;">
             <button class="btn btn-modern btn-success-modern" @onclick="StartGame" disabled="@(!_canStart)">Start Battle</button>
             @if (!string.IsNullOrEmpty(_startHint))
@@ -307,6 +299,10 @@ else if (GameService.Session.Phase == Phase.Playing)
     [SupplyParameterFromQuery(Name = "size")]
     public int? BoardSize { get; set; }
 
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "mode")]
+    public string? ShootingModeParam { get; set; }
+
     protected override void OnInitialized()
     {
         // If no session exists, create one from query parameter
@@ -317,6 +313,20 @@ else if (GameService.Session.Phase == Phase.Playing)
 
             if (GameService.Session != null)
             {
+                // Set shooting mode from query parameter
+                ShootingMode mode = ShootingMode.Single;
+                if (!string.IsNullOrEmpty(ShootingModeParam) && Enum.TryParse<ShootingMode>(ShootingModeParam, out var parsedMode))
+                {
+                    mode = parsedMode;
+                }
+
+                GameService.SetShootingMode(mode);
+
+                if (mode == ShootingMode.Salvo2)
+                    GameService.SetShotsPerTurn(2);
+                else
+                    GameService.SetShotsPerTurn(1);
+
                 // Randomize both fleets to get started
                 GameService.RandomizeFor(GameService.Session.P1);
                 GameService.RandomizeFor(GameService.Session.P2);

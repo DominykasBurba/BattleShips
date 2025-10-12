@@ -320,6 +320,14 @@
                 }
             </select>
         </div>
+        <div class="settings-row">
+            <span class="settings-label">Shoot Mode:</span>
+            <select class="custom-select" @bind="_shootingMode">
+                <option value="@ShootingMode.Single">Normal (1 per turn)</option>
+                <option value="@ShootingMode.Salvo2">Salvo (2 per turn)</option>
+                <option value="@ShootingMode.Salvo3x3">3x3 Area Shot</option>
+            </select>
+        </div>
         <div style="text-align: center; margin-top: 2rem;">
             <button class="btn btn-modern btn-primary-modern" @onclick="CreateGame">
                 @(_opponent == OpponentKind.Bot ? "Start Game" : "Create Online Game")
@@ -522,6 +530,7 @@ else if (_opponent == OpponentKind.Human && _gameId != null)
     private string? _winner;
     private string? _errorMessage;
     private string _lastShot = "—";
+    private ShootingMode _shootingMode = ShootingMode.Single;
     private readonly PlacementService _placementService = new();
 
     protected override async Task OnInitializedAsync()
@@ -552,8 +561,8 @@ else if (_opponent == OpponentKind.Human && _gameId != null)
 
         if (_opponent == OpponentKind.Bot)
         {
-            // Navigate to game page with board size parameter
-            Nav.NavigateTo($"/game?size={_size}");
+            // Navigate to game page with board size and shooting mode parameters
+            Nav.NavigateTo($"/game?size={_size}&mode={_shootingMode}");
         }
         else
         {
@@ -562,7 +571,7 @@ else if (_opponent == OpponentKind.Human && _gameId != null)
 
             try
             {
-                _gameId = await _hubConnection.InvokeAsync<string>("CreateGame", _size);
+                _gameId = await _hubConnection.InvokeAsync<string>("CreateGame", _size, _shootingMode);
                 _myBoard = new Board(_size);
                 _opponentBoard = new Board(_size);
                 _onlinePhase = Phase.Preparation;
@@ -590,6 +599,7 @@ else if (_opponent == OpponentKind.Human && _gameId != null)
                 _gameId = _joinGameId;
                 _opponent = OpponentKind.Human;
                 _size = result.BoardSize; // Use board size from the game
+                _shootingMode = result.ShootingMode; // Use shooting mode from the game
                 _myBoard = new Board(result.BoardSize);
                 _opponentBoard = new Board(result.BoardSize);
                 _opponentJoined = true;
@@ -609,7 +619,7 @@ else if (_opponent == OpponentKind.Human && _gameId != null)
     }
 
     // Data transfer object for JoinGame result
-    private record JoinGameResult(bool Success, int BoardSize);
+    private record JoinGameResult(bool Success, int BoardSize, ShootingMode ShootingMode);
 
     private void OnShipPlaced(ShipKind shipKind)
     {
@@ -674,7 +684,16 @@ else if (_opponent == OpponentKind.Human && _gameId != null)
 
         try
         {
-            await _hubConnection.InvokeAsync("FireShot", _gameId, pos);
+            if (_shootingMode == ShootingMode.Salvo3x3)
+            {
+                // Fire 3x3 salvo
+                await _hubConnection.InvokeAsync("Fire3x3Salvo", _gameId, pos);
+            }
+            else
+            {
+                // Fire single shot (Salvo2 will be handled by allowing multiple single shots)
+                await _hubConnection.InvokeAsync("FireShot", _gameId, pos);
+            }
         }
         catch (Exception ex)
         {
@@ -812,6 +831,41 @@ else if (_opponent == OpponentKind.Human && _gameId != null)
             var isMyShot = data.Shooter == _hubConnection?.ConnectionId;
             var board = isMyShot ? _opponentBoard : _myBoard;
 
+            // First, mark all sunk ships
+            if (data.SunkShips != null)
+            {
+                foreach (var shipPositions in data.SunkShips)
+                {
+                    foreach (var pos in shipPositions)
+                    {
+                        var cell = board[pos.Row, pos.Col];
+                        cell.Status = CellStatus.Sunk;
+                    }
+                }
+            }
+
+            // Then process each shot in the salvo (for cells that aren't part of sunk ships)
+            for (int i = 0; i < data.Positions.Count && i < data.Results.Count; i++)
+            {
+                var pos = data.Positions[i];
+                var result = data.Results[i];
+                var cell = board[pos.Row, pos.Col];
+
+                // Only update if not already marked as sunk
+                if (cell.Status != CellStatus.Sunk)
+                {
+                    cell.Status = result switch
+                    {
+                        ShotResult.Miss => CellStatus.Miss,
+                        ShotResult.Hit => CellStatus.Hit,
+                        _ => cell.Status
+                    };
+                }
+            }
+
+            var hitCount = data.Results.Count(r => r is ShotResult.Hit or ShotResult.Sunk);
+            _lastShot = $"3x3 Salvo at {data.CenterPosition}: {hitCount}/{data.Results.Count} hits";
+
             _isMyTurn = data.NextPlayer == _hubConnection?.ConnectionId;
 
             if (data.GamePhase == Phase.Finished)
@@ -877,6 +931,7 @@ else if (_opponent == OpponentKind.Human && _gameId != null)
         _opponentReady = false;
         _opponentJoined = false;
         _errorMessage = null;
+        _shootingMode = ShootingMode.Single;
         StateHasChanged();
     }
 
@@ -890,5 +945,5 @@ else if (_opponent == OpponentKind.Human && _gameId != null)
 
     // Data transfer objects for SignalR events
     private record ShotData(string Shooter, Position Position, ShotResult Result, Phase GamePhase, string? Winner, string? NextPlayer, List<Position>? SunkShipPositions);
-    private record SalvoData(string Shooter, Position CenterPosition, List<ShotResult> Results, Phase GamePhase, string? Winner, string? NextPlayer);
+    private record SalvoData(string Shooter, Position CenterPosition, List<ShotResult> Results, List<Position> Positions, Phase GamePhase, string? Winner, string? NextPlayer, List<List<Position>>? SunkShips);
 }

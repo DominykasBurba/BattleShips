@@ -22,22 +22,22 @@ public class GameHub(GameLobbyService lobby) : Hub
         await base.OnDisconnectedAsync(exception);
     }
 
-    public async Task<string> CreateGame(int boardSize)
+    public async Task<string> CreateGame(int boardSize, ShootingMode shootingMode)
     {
-        var gameId = lobby.CreateGame(Context.ConnectionId, boardSize);
+        var gameId = lobby.CreateGame(Context.ConnectionId, boardSize, shootingMode);
         await Groups.AddToGroupAsync(Context.ConnectionId, gameId);
         return gameId;
     }
 
     public async Task<JoinGameResult?> JoinGame(string gameId)
     {
-        var (success, boardSize) = lobby.JoinGame(gameId, Context.ConnectionId);
+        var (success, boardSize, shootingMode) = lobby.JoinGame(gameId, Context.ConnectionId);
         if (!success) return null;
 
         await Groups.AddToGroupAsync(Context.ConnectionId, gameId);
 
         await Clients.OthersInGroup(gameId).SendAsync("OpponentJoined");
-        return new JoinGameResult(success, boardSize);
+        return new JoinGameResult(success, boardSize, shootingMode);
     }
 
     public async Task PlaceShips(string gameId, List<ShipPlacement> ships)
@@ -97,9 +97,11 @@ public class GameHub(GameLobbyService lobby) : Hub
                 Shooter = Context.ConnectionId,
                 CenterPosition = centerPosition,
                 Results = results.Value.Results,
+                Positions = results.Value.Positions,
                 GamePhase = results.Value.GamePhase,
                 Winner = results.Value.Winner,
-                NextPlayer = results.Value.NextPlayer
+                NextPlayer = results.Value.NextPlayer,
+                SunkShips = results.Value.SunkShips
             });
         }
     }
@@ -132,4 +134,4 @@ public class GameHub(GameLobbyService lobby) : Hub
 }
 
 public record ShipPlacement(ShipKind Kind, Position Start, bool IsHorizontal);
-public record JoinGameResult(bool Success, int BoardSize);
+public record JoinGameResult(bool Success, int BoardSize, ShootingMode ShootingMode);
