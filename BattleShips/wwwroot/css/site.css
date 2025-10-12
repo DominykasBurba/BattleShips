@@ -4,6 +4,46 @@
     line-height: 0;
 }
 
+.board-with-labels {
+    display: flex;
+    flex-direction: column;
+}
+
+.column-labels {
+    --size: 10;
+    --cell: 34px;
+    
+    display: grid;
+    grid-template-columns: var(--cell) repeat(var(--size), var(--cell));
+    grid-auto-rows: var(--cell);
+}
+
+.board-row {
+    --size: 10;
+    --cell: 34px;
+    
+    display: grid;
+    grid-template-columns: var(--cell) repeat(var(--size), var(--cell));
+    grid-auto-rows: var(--cell);
+}
+
+.label-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    width: var(--cell);
+    height: var(--cell);
+    
+    font-size: 14px;
+    font-weight: bold;
+    color: #333;
+    background: #f8f9fa;
+    border: 1px solid #ddd;
+    box-sizing: border-box;
+    user-select: none;
+}
+
 .grid {
     --size: 10;
     --cell: 34px;
@@ -37,7 +77,22 @@
 }
 
 
-.grid-cell.ship { background:#cfe9cf; }
+.grid-cell.ship { 
+    background:#cfe9cf; 
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.grid-cell.ship:hover {
+    background: #a8d8a8;
+    transform: scale(1.05);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.grid-cell.ship:active {
+    background: #8bc34a;
+    transform: scale(0.95);
+}
 .grid-cell.hit  { background:#f66; color:#fff; font-weight:700; }
 .grid-cell.miss { background:#eef; color:#335; }
 .grid-cell.sunk { background:#b00; color:#fff; font-weight:900; }
@@ -48,4 +103,181 @@
 .grid-cell.sunk {
     pointer-events: none;
     cursor: default;
+}
+
+/* 3x3 salvo preview styling */
+.grid-cell.salvo-preview {
+    background: rgba(255, 255, 0, 0.3) !important;
+    border: 2px solid #ffd700;
+}
+
+.grid-cell.salvo-center {
+    background: rgba(255, 165, 0, 0.4) !important;
+    border: 2px solid #ff8c00;
+}
+
+/* Ship Status Panel */
+.ship-status {
+    background: #fff;
+    border: 2px solid #dc3545;
+    border-radius: 4px;
+    padding: 10px;
+    margin-left: 10px;
+    min-width: 150px;
+    height: fit-content;
+}
+
+.ship-status h6 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    font-weight: bold;
+    color: #333;
+    text-align: center;
+}
+
+.ship-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ship-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+}
+
+.ship-count {
+    background: #dc3545;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: bold;
+    min-width: 20px;
+    text-align: center;
+}
+
+.ship-name {
+    font-weight: bold;
+    color: #333;
+}
+
+.ship-size {
+    color: #666;
+    font-size: 11px;
+}
+
+/* Ship Inventory Panel */
+.ship-inventory {
+    background: #fff;
+    border: 2px solid #007bff;
+    border-radius: 4px;
+    padding: 10px;
+    margin-left: 10px;
+    min-width: 180px;
+    height: fit-content;
+}
+
+.ship-inventory h6 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    font-weight: bold;
+    color: #333;
+    text-align: center;
+}
+
+.ship-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px;
+    margin-bottom: 6px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: grab;
+    background: #f8f9fa;
+    transition: all 0.2s ease;
+}
+
+.ship-item:hover:not(.disabled) {
+    background: #e3f2fd;
+    border-color: #007bff;
+}
+
+.ship-item.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #f5f5f5;
+}
+
+.ship-item.selected {
+    background: #007bff;
+    color: white;
+    border-color: #0056b3;
+}
+
+.ship-item.selected .ship-segment {
+    background: white;
+}
+
+.ship-item.selected .ship-name,
+.ship-item.selected .ship-count {
+    color: white;
+}
+
+.ship-instructions {
+    margin-top: 10px;
+    padding: 8px;
+    background: #e3f2fd;
+    border-radius: 4px;
+    border: 1px solid #007bff;
+}
+
+.ship-item:active {
+    cursor: grabbing;
+}
+
+.ship-preview {
+    display: flex;
+    gap: 1px;
+}
+
+.ship-segment {
+    width: 12px;
+    height: 12px;
+    background: #007bff;
+    border-radius: 2px;
+}
+
+.ship-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.ship-info .ship-name {
+    font-size: 12px;
+    font-weight: bold;
+    color: #333;
+}
+
+.ship-info .ship-count {
+    font-size: 10px;
+    color: #666;
+}
+
+/* Drag and drop styling */
+.ship-item[draggable="true"]:hover {
+    transform: scale(1.02);
+}
+
+.drop-zone {
+    border: 2px dashed #007bff;
+    background: rgba(0, 123, 255, 0.1);
+}
+
+.drop-zone.invalid {
+    border-color: #dc3545;
+    background: rgba(220, 53, 69, 0.1);
 }

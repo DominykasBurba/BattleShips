@@ -1,50 +1,170 @@
 @using BattleShips.Domain
 @using BattleShips.Domain.Ships
 
-<div class="grid" style="--size:@Board.Size; --cell:34px">
-    @for (int r = 0; r < Board.Size; r++)
-    {
-        for (int c = 0; c < Board.Size; c++)
+<div class="board-frame">
+    <div class="board-with-labels">
+        <!-- Column headers (A, B, C, etc.) -->
+        <div class="column-labels" style="--size:@Board.Size; --cell:34px">
+            <div class="label-cell"></div> <!-- Empty corner cell -->
+            @for (int c = 0; c < Board.Size; c++)
+            {
+                <div class="label-cell">@((char)('A' + c))</div>
+            }
+        </div>
+        
+        <!-- Board rows with row numbers -->
+        @for (int r = 0; r < Board.Size; r++)
         {
-            // IMPORTANT: capture copies for the lambda
-            var rr = r;
-            var cc = c;
+            <div class="board-row" style="--size:@Board.Size; --cell:34px">
+                <!-- Row number -->
+                <div class="label-cell">@(r + 1)</div>
+                
+                <!-- Board cells -->
+                @for (int c = 0; c < Board.Size; c++)
+                {
+                    // IMPORTANT: capture copies for the lambda
+                    var rr = r;
+                    var cc = c;
 
-            var cell = Board[rr, cc];
-            var css = cell.Status == CellStatus.Ship ? "grid-cell ship" : "grid-cell";
-            var text = cell.Status == CellStatus.Ship ? "■" : string.Empty;
+                    var cell = Board[rr, cc];
+                    var css = cell.Status == CellStatus.Ship ? "grid-cell ship" : "grid-cell";
+                    var text = cell.Status == CellStatus.Ship ? "■" : string.Empty;
 
-            <CellView CssClass="@css"
-                      Text="@text"
-                      OnClick="@(() => Click(rr, cc))" />
+                    <CellView CssClass="@css"
+                              Text="@text"
+                              OnClick="@(() => Click(rr, cc))"
+                              OnRightClick="@(() => RightClick(rr, cc))" />
+                }
+            </div>
         }
-    }
+    </div>
 </div>
 
 @code {
     [Parameter] public Board Board { get; set; } = default!;
+    [Parameter] public EventCallback<ShipKind> OnShipPlaced { get; set; }
+    [Parameter] public ShipKind? SelectedShip { get; set; }
+    
     private ShipBase? _last;
 
-    private void Click(int r, int c)
+    private async Task Click(int r, int c)
     {
         var p = new Position(r, c);
-        if (_last is null)
+        var cell = Board[r, c];
+        
+        if (SelectedShip is not null)
         {
-            _last = new Destroyer(p, Orientation.Horizontal);
-            if (!Board.Place(_last)) _last = null;
+            // Place the selected ship
+            await PlaceSelectedShip(p);
+        }
+        else if (cell.Ship is not null)
+        {
+            // Rotate existing ship on the board
+            await RotateShip(cell.Ship);
+        }
+        else if (_last is not null)
+        {
+            // Rotate existing ship
+            Board.Remove(_last);
+            var newO = _last.Orientation == Orientation.Horizontal ? Orientation.Vertical : Orientation.Horizontal;
+            _last.Reposition(_last.Start, newO);
+
+            if (!Board.Place(_last))
+            {
+                var back = newO == Orientation.Horizontal ? Orientation.Vertical : Orientation.Horizontal;
+                _last.Reposition(_last.Start, back);
+                Board.Place(_last);
+            }
+            _last = null;
+        }
+        // Removed default destroyer placement - now clicking does nothing if no ship is selected
+    }
+
+    private async Task RightClick(int r, int c)
+    {
+        var p = new Position(r, c);
+        var cell = Board[r, c];
+        
+        if (cell.Ship is not null)
+        {
+            // Remove the ship from the board
+            await RemoveShip(cell.Ship);
+        }
+    }
+
+    private async Task PlaceSelectedShip(Position position)
+    {
+        if (SelectedShip is null) return;
+
+        // Try horizontal first
+        var ship = ShipFactory.Create(SelectedShip.Value, position, Orientation.Horizontal);
+        if (Board.Place(ship))
+        {
+            await OnShipPlaced.InvokeAsync(SelectedShip.Value);
+            StateHasChanged();
             return;
         }
 
-        Board.Remove(_last);
-        var newO = _last.Orientation == Orientation.Horizontal ? Orientation.Vertical : Orientation.Horizontal;
-        _last.Reposition(_last.Start, newO);
-
-        if (!Board.Place(_last))
+        // Try vertical
+        ship = ShipFactory.Create(SelectedShip.Value, position, Orientation.Vertical);
+        if (Board.Place(ship))
         {
-            var back = newO == Orientation.Horizontal ? Orientation.Vertical : Orientation.Horizontal;
-            _last.Reposition(_last.Start, back);
-            Board.Place(_last);
+            await OnShipPlaced.InvokeAsync(SelectedShip.Value);
+            StateHasChanged();
+            return;
         }
-        _last = null;
+
+        // Ship couldn't be placed - maybe show a message or visual feedback
     }
+
+    private async Task RotateShip(ShipBase ship)
+    {
+        // Remove the ship from the board
+        Board.Remove(ship);
+        
+        // Calculate new orientation
+        var newOrientation = ship.Orientation == Orientation.Horizontal ? Orientation.Vertical : Orientation.Horizontal;
+        
+        // Try to place the ship with new orientation
+        ship.Reposition(ship.Start, newOrientation);
+        
+        if (Board.Place(ship))
+        {
+            // Rotation successful
+            StateHasChanged();
+        }
+        else
+        {
+            // Rotation failed - revert to original orientation
+            var originalOrientation = newOrientation == Orientation.Horizontal ? Orientation.Vertical : Orientation.Horizontal;
+            ship.Reposition(ship.Start, originalOrientation);
+            Board.Place(ship);
+            StateHasChanged();
+        }
+    }
+
+    private async Task RemoveShip(ShipBase ship)
+    {
+        // Remove the ship from the board
+        Board.Remove(ship);
+        
+        // Notify parent component to update ship inventory
+        var shipKind = GetShipKind(ship);
+        await OnShipPlaced.InvokeAsync(shipKind); // This will trigger inventory update
+        
+        StateHasChanged();
+    }
+
+    private ShipKind GetShipKind(ShipBase ship)
+    {
+        return ship switch
+        {
+            Battleship => ShipKind.Battleship,
+            Submarine => ShipKind.Submarine,
+            Destroyer => ShipKind.Destroyer,
+            Cruiser => ShipKind.Cruiser,
+            _ => throw new ArgumentException("Unknown ship type")
+        };
+    }
+
 }

@@ -1,21 +1,39 @@
 @using BattleShips.Domain
+@using BattleShips.Services
+@inject GameService Game
 
 <div class="board-frame">
-    <div class="grid @(Interactable ? "" : "grid--disabled")" style="--size:@Board.Size; --cell:34px">
+    <div class="board-with-labels">
+        <!-- Column headers (A, B, C, etc.) -->
+        <div class="column-labels" style="--size:@Board.Size; --cell:34px">
+            <div class="label-cell"></div> <!-- Empty corner cell -->
+            @for (int c = 0; c < Board.Size; c++)
+            {
+                <div class="label-cell">@((char)('A' + c))</div>
+            }
+        </div>
+        
+        <!-- Board rows with row numbers -->
         @for (int r = 0; r < Board.Size; r++)
         {
-            for (int c = 0; c < Board.Size; c++)
-            {
-                var rr = r; var cc = c;                 // capture fix
+            <div class="board-row" style="--size:@Board.Size; --cell:34px">
+                <!-- Row number -->
+                <div class="label-cell">@(r + 1)</div>
+                
+                <!-- Board cells -->
+                @for (int c = 0; c < Board.Size; c++)
+                {
+                    var rr = r; var cc = c;                 // capture fix
 
-                var cell = Board[rr, cc];
-                var css = CellCss(cell, Own);
-                var text = CellText(cell, Own);
+                    var cell = Board[rr, cc];
+                    var css = CellCss(cell, Own, rr, cc);
+                    var text = CellText(cell, Own);
 
-                <CellView CssClass="@css"
-                          Text="@text"
-                          OnClick="@(() => Click(rr, cc))" />
-            }
+                    <CellView CssClass="@css"
+                              Text="@text"
+                              OnClick="@(() => Click(rr, cc))" />
+                }
+            </div>
         }
     </div>
 </div>
@@ -36,10 +54,10 @@
         return OnFire(new Position(r, c));
     }
 
-    private static string CellCss(Cell cell, bool own)
+    private string CellCss(Cell cell, bool own, int row, int col)
     {
         var baseCls = "grid-cell";
-        return cell.Status switch
+        var statusCss = cell.Status switch
         {
             CellStatus.Hit  => $"{baseCls} hit",
             CellStatus.Miss => $"{baseCls} miss",
@@ -47,6 +65,15 @@
             CellStatus.Ship when own => $"{baseCls} ship",
             _ => baseCls
         };
+
+        // Add 3x3 preview styling when in 3x3 mode and hovering
+        if (Game.ShootingMode == ShootingMode.Salvo3x3 && !own && Interactable)
+        {
+            // This would need JavaScript hover events to work properly
+            // For now, we'll just return the base styling
+        }
+
+        return statusCss;
     }
 
     private static string CellText(Cell cell, bool own) => cell.Status switch

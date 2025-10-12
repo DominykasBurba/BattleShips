@@ -1,0 +1,51 @@
+@using BattleShips.Domain
+@using BattleShips.Domain.Ships
+
+<div class="ship-status">
+    <h6>@Title</h6>
+    <div class="ship-list">
+        @foreach (var shipGroup in ShipGroups)
+        {
+            <div class="ship-group">
+                <span class="ship-count">@shipGroup.Count</span>
+                <span class="ship-name">@shipGroup.Name</span>
+                <span class="ship-size">(@shipGroup.Length×1)</span>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "Ships";
+    [Parameter] public Board Board { get; set; } = default!;
+
+    private List<ShipGroup> ShipGroups => GetShipGroups();
+
+    private List<ShipGroup> GetShipGroups()
+    {
+        var groups = new List<ShipGroup>();
+        
+        // Get all ships that are not sunk
+        var activeShips = Board.Ships.Where(s => !s.IsSunk).ToList();
+        
+        // Group by ship type and length
+        var shipGroups = activeShips.GroupBy(s => new { s.Name, s.Length })
+                                   .Select(g => new ShipGroup
+                                   {
+                                       Name = g.Key.Name,
+                                       Length = g.Key.Length,
+                                       Count = g.Count()
+                                   })
+                                   .OrderByDescending(sg => sg.Length)
+                                   .ToList();
+
+        return shipGroups;
+    }
+
+    private class ShipGroup
+    {
+        public string Name { get; set; } = "";
+        public int Length { get; set; }
+        public int Count { get; set; }
+    }
+}

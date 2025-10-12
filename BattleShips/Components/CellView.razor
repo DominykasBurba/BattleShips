@@ -1,10 +1,11 @@
 @rendermode InteractiveServer
 
 
-<button type="button" class="@CssClass" @onclick="OnClick">@Text</button>
+<button type="button" class="@CssClass" @onclick="OnClick" @oncontextmenu="OnRightClick">@Text</button>
 
 @code {
     [Parameter] public string CssClass { get; set; } = "grid-cell";
     [Parameter] public string Text { get; set; } = "";
     [Parameter] public EventCallback OnClick { get; set; }
+    [Parameter] public EventCallback OnRightClick { get; set; }
 }

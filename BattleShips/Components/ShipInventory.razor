@@ -1,0 +1,141 @@
+@using BattleShips.Domain
+@using BattleShips.Domain.Ships
+
+<div class="ship-inventory">
+    <h6>Available Ships</h6>
+    <div class="ship-list">
+        @foreach (var shipType in AvailableShips)
+        {
+            <div class="ship-item @(shipType.Count == 0 ? "disabled" : "") @(_selectedShip == shipType.Kind ? "selected" : "")" 
+                 @onclick="@(() => SelectShip(shipType.Kind))">
+                <div class="ship-preview">
+                    @for (int i = 0; i < shipType.Length; i++)
+                    {
+                        <div class="ship-segment"></div>
+                    }
+                </div>
+                <div class="ship-info">
+                    <span class="ship-name">@shipType.Name</span>
+                    <span class="ship-count">@shipType.Count left</span>
+                </div>
+            </div>
+        }
+    </div>
+    
+    @if (_selectedShip is not null)
+    {
+        <div class="ship-instructions">
+            <small class="text-muted">
+                Selected: @GetShipName(_selectedShip.Value)<br/>
+                Click on the board to place it
+            </small>
+        </div>
+    }
+    else
+    {
+        <div class="ship-instructions">
+            <small class="text-muted">
+                Select a ship to place it<br/>
+                Left-click ships to rotate them<br/>
+                Right-click ships to remove them
+            </small>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Board Board { get; set; } = default!;
+    [Parameter] public EventCallback<ShipKind> OnShipPlaced { get; set; }
+    [Parameter] public EventCallback<ShipKind?> OnShipSelected { get; set; }
+
+    private List<ShipTypeInfo> AvailableShips => GetAvailableShips();
+
+    private List<ShipTypeInfo> GetAvailableShips()
+    {
+        var shipTypes = new List<ShipTypeInfo>();
+        
+        // Get the default fleet composition
+        var fleetComposition = DefaultFleet.Composition.GroupBy(k => k)
+                                                      .ToDictionary(g => g.Key, g => g.Count());
+        
+        // Count how many of each type are already placed
+        var placedShips = Board.Ships.GroupBy(s => GetShipKind(s))
+                                   .ToDictionary(g => g.Key, g => g.Count());
+        
+        // Calculate remaining ships
+        foreach (var kvp in fleetComposition)
+        {
+            var shipKind = kvp.Key;
+            var totalCount = kvp.Value;
+            var placedCount = placedShips.GetValueOrDefault(shipKind, 0);
+            var remainingCount = totalCount - placedCount;
+            
+            shipTypes.Add(new ShipTypeInfo
+            {
+                Kind = shipKind,
+                Name = GetShipName(shipKind),
+                Length = GetShipLength(shipKind),
+                Count = remainingCount
+            });
+        }
+        
+        return shipTypes.OrderByDescending(s => s.Length).ToList();
+    }
+
+    private ShipKind GetShipKind(ShipBase ship)
+    {
+        return ship switch
+        {
+            Battleship => ShipKind.Battleship,
+            Submarine => ShipKind.Submarine,
+            Destroyer => ShipKind.Destroyer,
+            Cruiser => ShipKind.Cruiser,
+            _ => throw new ArgumentException("Unknown ship type")
+        };
+    }
+
+    private string GetShipName(ShipKind kind)
+    {
+        return kind switch
+        {
+            ShipKind.Battleship => "Battleship",
+            ShipKind.Submarine => "Submarine",
+            ShipKind.Destroyer => "Destroyer",
+            ShipKind.Cruiser => "Cruiser",
+            _ => "Unknown"
+        };
+    }
+
+    private int GetShipLength(ShipKind kind)
+    {
+        return kind switch
+        {
+            ShipKind.Battleship => 4,
+            ShipKind.Submarine => 3,
+            ShipKind.Destroyer => 2,
+            ShipKind.Cruiser => 1,
+            _ => 1
+        };
+    }
+
+    private ShipKind? _selectedShip;
+
+    private async Task SelectShip(ShipKind shipKind)
+    {
+        var shipType = AvailableShips.FirstOrDefault(s => s.Kind == shipKind);
+        if (shipType?.Count > 0)
+        {
+            _selectedShip = shipKind;
+            await OnShipSelected.InvokeAsync(shipKind);
+            StateHasChanged();
+        }
+    }
+
+    private class ShipTypeInfo
+    {
+        public ShipKind Kind { get; set; }
+        public string Name { get; set; } = "";
+        public int Length { get; set; }
+        public int Count { get; set; }
+    }
+}
