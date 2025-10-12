@@ -1,282 +1,619 @@
 @page "/"
 @rendermode InteractiveServer
 @using BattleShips.Domain
+@using Microsoft.AspNetCore.SignalR.Client
+@using BattleShips.Hubs
 @inject BattleShips.Services.GameService Game
 @inject NavigationManager Nav
+@implements IAsyncDisposable
 
-<h3 class="mb-3">Battleships</h3>
+<style>
+    .battleships-hero {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 16px;
+        padding: 3rem 2rem;
+        margin-bottom: 2rem;
+        color: white;
+        box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
+    }
 
-@if (Game.Session is null)
+    .battleships-hero h1 {
+        font-size: 3rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .battleships-hero p {
+        font-size: 1.2rem;
+        opacity: 0.95;
+        margin: 0;
+    }
+
+    .game-mode-selector {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .mode-card {
+        background: white;
+        border-radius: 12px;
+        padding: 2rem;
+        border: 3px solid transparent;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.07);
+    }
+
+    .mode-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+    }
+
+    .mode-card.selected {
+        border-color: #667eea;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+    }
+
+    .mode-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+
+    .mode-card h4 {
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: #2d3748;
+    }
+
+    .mode-card p {
+        color: #718096;
+        margin: 0;
+        font-size: 0.95rem;
+    }
+
+    .settings-panel {
+        background: white;
+        border-radius: 12px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.07);
+    }
+
+    .settings-panel h5 {
+        font-weight: 600;
+        margin-bottom: 1.5rem;
+        color: #2d3748;
+    }
+
+    .settings-row {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .settings-label {
+        font-weight: 500;
+        color: #4a5568;
+        min-width: 120px;
+    }
+
+    .custom-select {
+        border-radius: 8px;
+        border: 2px solid #e2e8f0;
+        padding: 0.5rem 1rem;
+        font-size: 1rem;
+        transition: all 0.2s;
+    }
+
+    .custom-select:focus {
+        border-color: #667eea;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .custom-input {
+        border-radius: 8px;
+        border: 2px solid #e2e8f0;
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+        transition: all 0.2s;
+        flex: 1;
+    }
+
+    .custom-input:focus {
+        border-color: #667eea;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .custom-input::placeholder {
+        color: #a0aec0;
+    }
+
+    .btn-modern {
+        border-radius: 8px;
+        padding: 0.75rem 2rem;
+        font-weight: 600;
+        border: none;
+        transition: all 0.3s;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .btn-modern:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+    }
+
+    .btn-primary-modern {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .btn-success-modern {
+        background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+        color: white;
+    }
+
+    .game-code-display {
+        background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+        border-radius: 12px;
+        padding: 1.5rem;
+        text-align: center;
+        margin-bottom: 1.5rem;
+        border: 2px dashed #cbd5e0;
+    }
+
+    .game-code-display .code {
+        font-size: 2rem;
+        font-weight: 700;
+        letter-spacing: 0.3rem;
+        color: #667eea;
+        font-family: 'Courier New', monospace;
+    }
+
+    .game-code-display .label {
+        font-size: 0.9rem;
+        color: #718096;
+        margin-bottom: 0.5rem;
+    }
+
+    .status-bar {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.07);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .status-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .status-label {
+        font-weight: 600;
+        color: #4a5568;
+    }
+
+    .status-value {
+        color: #667eea;
+        font-weight: 700;
+    }
+
+    .status-value.your-turn {
+        color: #48bb78;
+        animation: pulse 2s infinite;
+    }
+
+    .status-value.opponent-turn {
+        color: #f6ad55;
+    }
+
+    @@keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+    }
+
+    .board-section {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.07);
+    }
+
+    .board-section h5 {
+        font-weight: 600;
+        color: #2d3748;
+        margin-bottom: 1rem;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .btn-secondary-modern {
+        background: linear-gradient(135deg, #a0aec0 0%, #718096 100%);
+        color: white;
+    }
+
+    .btn-danger-modern {
+        background: linear-gradient(135deg, #fc8181 0%, #f56565 100%);
+        color: white;
+    }
+
+    .winner-banner {
+        background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+        border-radius: 16px;
+        padding: 3rem 2rem;
+        text-align: center;
+        color: white;
+        box-shadow: 0 10px 40px rgba(72, 187, 120, 0.3);
+        margin-bottom: 2rem;
+    }
+
+    .winner-banner h2 {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+    }
+
+    .winner-banner p {
+        font-size: 1.3rem;
+        opacity: 0.95;
+    }
+
+    @@media (max-width: 768px) {
+        .game-mode-selector {
+            grid-template-columns: 1fr;
+        }
+
+        .status-bar {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+    }
+</style>
+
+@if (Game.Session is null && _gameId == null)
 {
-    <!-- SESSION CREATION UI -->
-    <div class="card mb-3">
-        <div class="card-body d-flex align-items-center gap-3 flex-wrap">
-            <label class="form-label mb-0">Opponent:</label>
-            <select class="form-select w-auto" @bind="_opponent">
-                <option value="Bot">Bot (local AI)</option>
-                <option value="Human">Real person (online)</option>
-            </select>
+    <!-- MODERN HERO SECTION -->
+    <div class="battleships-hero">
+        <h1>Battleships</h1>
+        <p>Choose your opponent and start playing!</p>
+    </div>
 
-            <label class="form-label mb-0 ms-3">Board size:</label>
-            <select class="form-select w-auto" @bind="_size">
-                @foreach (var s in _sizes)
-                {
-                    <option value="@s">@s×@s</option>
-                }
-            </select>
-
-            <button class="btn btn-primary ms-2" @onclick="CreateGame">Create game</button>
+    <!-- GAME MODE SELECTOR -->
+    <div class="game-mode-selector">
+        <div class="mode-card @(_opponent == OpponentKind.Bot ? "selected" : "")" @onclick="() => _opponent = OpponentKind.Bot">
+            <div class="mode-icon">AI</div>
+            <h4>Play vs AI</h4>
+            <p>Challenge our intelligent bot in a quick local game</p>
+        </div>
+        <div class="mode-card @(_opponent == OpponentKind.Human ? "selected" : "")" @onclick="() => _opponent = OpponentKind.Human">
+            <div class="mode-icon">MP</div>
+            <h4>Online Multiplayer</h4>
+            <p>Create or join a game to play with friends online</p>
         </div>
     </div>
 
-    @if (_opponent == OpponentKind.Human && _inviteUrl is not null)
+    <!-- SETTINGS PANEL -->
+    <div class="settings-panel">
+        <h5>Game Settings</h5>
+        <div class="settings-row">
+            <span class="settings-label">Board Size:</span>
+            <select class="custom-select" @bind="_size">
+                @foreach (var s in _sizes)
+                {
+                    <option value="@s">@s × @s</option>
+                }
+            </select>
+        </div>
+        <div style="text-align: center; margin-top: 2rem;">
+            <button class="btn btn-modern btn-primary-modern" @onclick="CreateGame">
+                @(_opponent == OpponentKind.Bot ? "Start Game" : "Create Online Game")
+            </button>
+        </div>
+    </div>
+
+    @if (_opponent == OpponentKind.Human)
     {
-        <div class="alert alert-info">
-            <strong>Generating session URL…</strong><br />
-            (placeholder — SignalR/Azure not wired yet)<br />
-            Invite link: <code>@_inviteUrl</code>
+        <div class="settings-panel">
+            <h5>Join Existing Game</h5>
+            <div class="settings-row">
+                <input class="custom-input" placeholder="Enter game code..." @bind="_joinGameId" />
+                <button class="btn btn-modern btn-success-modern" @onclick="JoinOnlineGame">
+                    Join Game
+                </button>
+            </div>
         </div>
     }
 }
-else
+else if (_opponent == OpponentKind.Human && _gameId != null)
 {
-    <!-- STATUS BAR -->
-    <div class="mb-2">
-        <strong>Phase:</strong> @Game.Session.Phase
-        @if (Game.Session.Phase == Phase.Playing)
-        {
-            <span class="ms-3"><strong>Turn:</strong> @Game.Session.Current.Name</span>
-        }
-        @if (Game.Session.Phase == Phase.Finished)
-        {
-            <span class="ms-3"><strong>Winner:</strong> @(Game.Session.Winner?.Name ?? "Draw")</span>
-        }
-    </div>
-
-    <!-- PREPARATION -->
-    @if (Game.Session.Phase == Phase.Preparation)
+    <!-- ONLINE MULTIPLAYER MODE -->
+    @if (_onlinePhase == Phase.Preparation)
     {
+        <!-- ONLINE SHIP PLACEMENT -->
+        <div class="game-code-display">
+            <div class="label">Share this code with your opponent:</div>
+            <div class="code">@_gameId</div>
+        </div>
+
+        @if (!_opponentJoined)
+        {
+            <div class="alert alert-info" style="border-radius: 12px; border-left: 4px solid #667eea;">
+                <strong>Waiting for opponent to join...</strong>
+                <p class="mb-0 mt-1">Share the game code above with your friend!</p>
+            </div>
+        }
+        else if (_opponentReady && !_isReady)
+        {
+            <div class="alert alert-success" style="border-radius: 12px; border-left: 4px solid #48bb78;">
+                <strong>Opponent is ready!</strong>
+                <p class="mb-0 mt-1">Place your ships and click Ready to start the battle.</p>
+            </div>
+        }
+        else if (!_opponentReady && _isReady)
+        {
+            <div class="alert alert-warning" style="border-radius: 12px; border-left: 4px solid #f6ad55;">
+                <strong>Waiting for opponent to place ships...</strong>
+                <p class="mb-0 mt-1">Hang tight, they're setting up their fleet!</p>
+            </div>
+        }
+        else if (_opponentJoined && !_isReady && !_opponentReady)
+        {
+            <div class="alert alert-info" style="border-radius: 12px; border-left: 4px solid #667eea;">
+                <strong>Opponent joined!</strong>
+                <p class="mb-0 mt-1">Both players placing ships...</p>
+            </div>
+        }
+
         <div class="row g-3">
             <div class="col-md-6">
                 <div class="d-flex align-items-start gap-3">
                     <div>
-                        <h5>You — place fleet</h5>
-                        <PlacementBoard Board="@Game.Session.P1.Board" 
-                                       OnShipPlaced="OnShipPlaced" 
-                                       SelectedShip="_selectedShip" />
-                        <div class="mt-2">
-                            <button class="btn btn-secondary me-2" @onclick="() => Game.RandomizeFor(Game.Session.P1)">Randomize</button>
-                            <button class="btn btn-outline-secondary" @onclick="Game.ResetShips">Reset ships</button>
+                        <h5>Your Fleet</h5>
+                        <PlacementBoard Board="@_myBoard"
+                                       OnShipPlaced="OnShipPlaced"
+                                       SelectedShip="@_selectedShip" />
+                        <div class="mt-2 action-buttons">
+                            <button class="btn btn-modern btn-secondary-modern" @onclick="RandomizeOnlineFleet">
+                                Randomize
+                            </button>
+                            <button class="btn btn-modern btn-danger-modern" @onclick="ResetOnlineFleet">
+                                Reset
+                            </button>
+                            <button class="btn btn-modern btn-success-modern" @onclick="MarkReady" disabled="@(!CanMarkReady())">
+                                Ready!
+                            </button>
                         </div>
                     </div>
                     <div class="d-flex flex-column gap-3">
-                        <ShipInventory Board="@Game.Session.P1.Board" 
-                                     OnShipPlaced="OnShipPlaced" 
+                        <ShipInventory Board="@_myBoard"
+                                     OnShipPlaced="OnShipPlaced"
                                      OnShipSelected="OnShipSelected" />
-                        <ShipStatus Title="Your Fleet" Board="@Game.Session.P1.Board" />
+                        <ShipStatus Title="Your Fleet" Board="@_myBoard" />
                     </div>
                 </div>
             </div>
 
             <div class="col-md-6">
-                <div class="d-flex align-items-start gap-3">
-                    <div>
-                        @if (_opponent == OpponentKind.Bot)
-                        {
-                            <h5>Enemy (bot)</h5>
-                            <div class="alert alert-info">Bot fleet is ready (hidden).</div>
-                            <button class="btn btn-secondary" @onclick="() => Game.RandomizeFor(Game.Session.P2)">Re-roll bot fleet</button>
-                        }
-                        else
-                        {
-                            <h5>Opponent (remote)</h5>
-                            <div class="alert alert-info">
-                                Multiplayer placeholder — remote player will place their fleet here.
-                            </div>
-                        }
+                <h5>Opponent</h5>
+                @if (!_opponentJoined)
+                {
+                    <div class="alert alert-warning">Waiting for opponent...</div>
+                }
+                else
+                {
+                    <div class="alert alert-info">
+                        Opponent is @(_opponentReady ? "ready!" : "placing ships...")
                     </div>
-                    <ShipStatus Title="Enemy Fleet" Board="@Game.Session.P2.Board" />
-                </div>
+                }
             </div>
         </div>
-
-        <div class="mt-3 d-flex align-items-center gap-2">
-            <label class="me-2">Shoot mode:</label>
-            <select class="form-select w-auto" @onchange="OnShootingModeChanged">
-                <option value="Single">Normal (1 per turn)</option>
-                <option value="Salvo2">Salvo (2 per turn)</option>
-                <option value="Salvo3x3">3x3 Area Shot</option>
-            </select>
-
-            <button class="btn btn-success ms-3" @onclick="StartGame" disabled="@(!_canStart)">Play</button>
-            <small class="text-muted ms-2">@_startHint</small>
-        </div>
     }
-
-    else if (Game.Session.Phase == Phase.Playing)
+    else if (_onlinePhase == Phase.Playing)
     {
-        var canShoot = ReferenceEquals(Game.Session.Current, Game.Session.P1);
+        <!-- ONLINE BATTLE PHASE -->
+        <div class="status-bar">
+            <div class="status-item">
+                <span class="status-label">Phase:</span>
+                <span class="status-value">Battle</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Turn:</span>
+                <span class="status-value @(_isMyTurn ? "your-turn" : "opponent-turn")">
+                    @(_isMyTurn ? "Your Turn" : "Opponent's Turn")
+                </span>
+            </div>
+        </div>
 
         <div class="row g-3">
             <div class="col-md-6">
                 <div class="d-flex align-items-start gap-3">
                     <div>
-                        <h5>You</h5>
-                        <BattleBoard Board="@Game.Session.P1.Board" Own="true" Interactable="false" OnFire="null" />
+                        <h5>Your Board</h5>
+                        <BattleBoard Board="@_myBoard" Own="true" Interactable="false" OnFire="null" />
                     </div>
-                    <ShipStatus Title="Your Ships" Board="@Game.Session.P1.Board" />
+                    <ShipStatus Title="Your Ships" Board="@_myBoard" />
                 </div>
             </div>
+
             <div class="col-md-6">
                 <div class="d-flex align-items-start gap-3">
                     <div>
-                        <h5>Enemy (@(_opponent == OpponentKind.Bot ? "bot" : "remote"))</h5>
-                        @if (_opponent == OpponentKind.Bot)
+                        <h5>Enemy Board</h5>
+                        <BattleBoard Board="@_opponentBoard"
+                                     Own="false"
+                                     Interactable="@_isMyTurn"
+                                     OnFire="OnFireAtEnemyOnline" />
+                        @if (!_isMyTurn)
                         {
-                            <BattleBoard Board="@Game.Session.P2.Board"
-                                         Own="false"
-                                         Interactable="@canShoot"
-                                         OnFire="OnFireAtEnemy" />
-                            @if (!canShoot)
-                            {
-                                <small class="text-muted">Wait for your turn…</small>
-                            }
-                        }
-                        else
-                        {
-                            <div class="alert alert-info">
-                                Multiplayer placeholder — clicking is disabled until SignalR is implemented.
-                            </div>
+                            <small class="text-muted">Wait for your turn...</small>
                         }
                     </div>
-                    <ShipStatus Title="Enemy Ships" Board="@Game.Session.P2.Board" />
+                    <ShipStatus Title="Enemy Ships" Board="@_opponentBoard" />
                 </div>
             </div>
         </div>
 
-        <!-- ACTIONS -->
         <ControlsBar
-            OnSurrender="() => Game.Surrender(Game.Session.P1)"
-            OnRequestDraw="() => Game.ProposeDraw(Game.Session.P1)"
-            OnAcceptDraw="() => Game.AcceptDraw(Game.Session.P1)" />
+            OnSurrender="OnSurrender"
+            OnRequestDraw="OnRequestDraw"
+            OnAcceptDraw="OnAcceptDraw" />
 
         <div class="mt-3">
-            <strong>Last shot:</strong> @_last
+            <strong>Last shot:</strong> @_lastShot
         </div>
     }
-    else if (Game.Session.Phase == Phase.Finished)
+    else if (_onlinePhase == Phase.Finished)
     {
-        <h5>Winner: @(Game.Session.Winner?.Name ?? "Draw")</h5>
-        <button class="btn btn-primary" @onclick="() => Game.ResetShips()">New game</button>
+        <!-- ONLINE GAME OVER -->
+        <div class="winner-banner">
+            <h2>Game Over!</h2>
+            <p>Winner: @(_winner ?? "It's a Draw!")</p>
+        </div>
+        <div style="text-align: center;">
+            <button class="btn btn-modern btn-primary-modern" @onclick="ReturnToLobby">
+                Back to Lobby
+            </button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-danger mt-3">@_errorMessage</div>
     }
 }
 
 @code {
     private enum OpponentKind { Bot, Human }
 
+    // Common fields
     private OpponentKind _opponent = OpponentKind.Bot;
     private int _size = 10;
     private readonly int[] _sizes = new[] { 8, 10, 12 };
-
-    private string? _inviteUrl;
-    private string _last = "—";
-    private bool _canStart;
-    private string _startHint = "Randomize your fleet. Bot fleet is hidden.";
     private ShipKind? _selectedShip;
 
-    private void CreateGame()
+
+    // Online multiplayer fields
+    private HubConnection? _hubConnection;
+    private string? _gameId;
+    private string? _joinGameId;
+    private Board _myBoard = new(10);
+    private Board _opponentBoard = new(10);
+    private Phase _onlinePhase = Phase.Preparation;
+    private bool _isMyTurn;
+    private bool _isReady;
+    private bool _opponentReady;
+    private bool _opponentJoined;
+    private string? _winner;
+    private string? _errorMessage;
+    private string _lastShot = "—";
+    private readonly PlacementService _placementService = new();
+
+    protected override async Task OnInitializedAsync()
     {
-        _inviteUrl = null;
+        // Initialize SignalR connection
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(Nav.ToAbsoluteUri("/gamehub"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        // Register event handlers
+        _hubConnection.On("OpponentJoined", OnOpponentJoined);
+        _hubConnection.On("OpponentReady", OnOpponentReadyReceived);
+        _hubConnection.On<string>("GameStarted", OnGameStarted);
+        _hubConnection.On<ShotData>("ShotFired", OnShotFired);
+        _hubConnection.On<SalvoData>("SalvoFired", OnSalvoFired);
+        _hubConnection.On<string>("PlayerSurrendered", OnPlayerSurrendered);
+        _hubConnection.On("DrawProposed", OnDrawProposed);
+        _hubConnection.On("DrawAccepted", OnDrawAccepted);
+        _hubConnection.On<string>("PlayerDisconnected", OnPlayerDisconnected);
+
+        await _hubConnection.StartAsync();
+    }
+
+    private async void CreateGame()
+    {
+        _errorMessage = null;
 
         if (_opponent == OpponentKind.Bot)
         {
-            Game.NewLocalSession(_size, enemyIsAi: true);
-            if (Game.Session is not null)
+            // Navigate to game page with board size parameter
+            Nav.NavigateTo($"/game?size={_size}");
+        }
+        else
+        {
+            // Create online multiplayer game
+            if (_hubConnection == null) return;
+
+            try
             {
-                Game.RandomizeFor(Game.Session.P1);
-                Game.RandomizeFor(Game.Session.P2);
-                _canStart = true;
-                _startHint = "Ready. Press Play.";
+                _gameId = await _hubConnection.InvokeAsync<string>("CreateGame", _size);
+                _myBoard = new Board(_size);
+                _opponentBoard = new Board(_size);
+                _onlinePhase = Phase.Preparation;
+                _opponentJoined = false;
+                _isReady = false;
+                _opponentReady = false;
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                _errorMessage = $"Failed to create game: {ex.Message}";
             }
         }
-        else
-        {
-            // Placeholder: don't create local session; show a fake invite URL
-            var code = Guid.NewGuid().ToString("N")[..8];
-            _inviteUrl = $"{Nav.BaseUri}join/{code}";
-        }
     }
 
-    private void StartGame()
+    private async Task JoinOnlineGame()
     {
-        if (Game.Start())
-            StateHasChanged();
-        else
-            _startHint = "Both fleets must be complete and valid (no touching).";
-    }
+        if (_hubConnection == null || string.IsNullOrEmpty(_joinGameId)) return;
 
-    private void OnShootingModeChanged(ChangeEventArgs e)
-    {
-        if (Enum.TryParse<ShootingMode>(e.Value?.ToString(), out var mode))
+        try
         {
-            Game.SetShootingMode(mode);
-            
-            // Also set shots per turn for backward compatibility
-            if (mode == ShootingMode.Salvo2)
-                Game.SetShotsPerTurn(2);
+            var result = await _hubConnection.InvokeAsync<JoinGameResult?>("JoinGame", _joinGameId);
+            if (result != null && result.Success)
+            {
+                _gameId = _joinGameId;
+                _opponent = OpponentKind.Human;
+                _size = result.BoardSize; // Use board size from the game
+                _myBoard = new Board(result.BoardSize);
+                _opponentBoard = new Board(result.BoardSize);
+                _opponentJoined = true;
+                _isReady = false;
+                _opponentReady = false;
+                StateHasChanged();
+            }
             else
-                Game.SetShotsPerTurn(1);
-        }
-    }
-
-    private async Task OnFireAtEnemy(Position p)
-    {
-        if (Game.Session is null || Game.Session.Phase != Phase.Playing) return;
-
-        if (Game.ShootingMode == ShootingMode.Salvo3x3)
-        {
-            // Handle 3x3 salvo shooting
-            var results = Game.Fire3x3Salvo(p);
-            var hitCount = results.Count(r => r is ShotResult.Hit or ShotResult.Sunk);
-            var totalShots = results.Count;
-            _last = $"3x3 Salvo at {p}: {hitCount}/{totalShots} hits";
-            
-            // End turn after 3x3 salvo
-            if (Game.Session.Phase == Phase.Playing)
             {
-                Game.Session.EndTurn();
-                
-                // Handle AI turn
-                if (Game.Session.Current.Kind == PlayerKind.AI)
-                {
-                    await Task.Delay(500); // Brief pause before AI shoots
-                    Game.HandleAiTurn();
-                    StateHasChanged();
-                }
+                _errorMessage = "Failed to join game. Game may be full or not exist.";
             }
         }
-        else
+        catch (Exception ex)
         {
-            // Handle single shot or 2-shot salvo
-            var result = Game.FireAt(p);
-            _last = $"{p}: {result}";
-        }
-        
-        StateHasChanged();               // show ✖ / • / ☒ immediately
-
-        // optional brief pause so you notice the enemy turn when you miss
-        if (Game.ShootingMode != ShootingMode.Salvo3x3)
-        {
-            await Task.Delay(250);
-            StateHasChanged();
+            _errorMessage = $"Failed to join game: {ex.Message}";
         }
     }
+
+    // Data transfer object for JoinGame result
+    private record JoinGameResult(bool Success, int BoardSize);
 
     private void OnShipPlaced(ShipKind shipKind)
     {
-        // Clear selected ship after placement
         _selectedShip = null;
-        // Refresh the UI to update ship counts
         StateHasChanged();
     }
 
@@ -286,12 +623,272 @@ else
         StateHasChanged();
     }
 
-    protected override void OnAfterRender(bool firstRender)
+    // Online multiplayer methods
+    private void RandomizeOnlineFleet()
     {
-        if (Game.Session is not null && Game.Session.Phase == Phase.Preparation)
+        _placementService.RandomizeFleet(_myBoard);
+        StateHasChanged();
+    }
+
+    private void ResetOnlineFleet()
+    {
+        _myBoard.Clear();
+        _isReady = false;
+        StateHasChanged();
+    }
+
+    private bool CanMarkReady()
+    {
+        var expected = new[] { 4, 3, 3, 2, 2, 2, 1, 1, 1, 1 }.OrderBy(x => x).ToArray();
+        var actual = _myBoard.Ships.Select(s => s.Length).OrderBy(x => x).ToArray();
+        return expected.SequenceEqual(actual);
+    }
+
+    private async Task MarkReady()
+    {
+        if (_hubConnection == null || _gameId == null || !CanMarkReady()) return;
+
+        try
         {
-            _canStart = Game.Session.P1.Board.Ships.Count > 0 &&
-                        Game.Session.P2.Board.Ships.Count > 0;
+            var placements = _myBoard.Ships.Select(ship =>
+            {
+                var cells = ship.Cells().OrderBy(p => p.Row).ThenBy(p => p.Col).ToList();
+                var start = cells.First();
+                var isHorizontal = cells.Count > 1 && cells[0].Row == cells[1].Row;
+                return new ShipPlacement(ship.Kind, start, isHorizontal);
+            }).ToList();
+
+            await _hubConnection.InvokeAsync("PlaceShips", _gameId, placements);
+            _isReady = true;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to mark ready: {ex.Message}";
         }
     }
+
+    private async Task OnFireAtEnemyOnline(Position pos)
+    {
+        if (_hubConnection == null || _gameId == null || !_isMyTurn) return;
+
+        try
+        {
+            await _hubConnection.InvokeAsync("FireShot", _gameId, pos);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to fire: {ex.Message}";
+        }
+    }
+
+    private async Task OnSurrender()
+    {
+        if (_hubConnection == null || _gameId == null) return;
+        await _hubConnection.InvokeAsync("Surrender", _gameId);
+    }
+
+    private async Task OnRequestDraw()
+    {
+        if (_hubConnection == null || _gameId == null) return;
+        await _hubConnection.InvokeAsync("ProposeDraw", _gameId);
+    }
+
+    private async Task OnAcceptDraw()
+    {
+        if (_hubConnection == null || _gameId == null) return;
+        await _hubConnection.InvokeAsync("AcceptDraw", _gameId);
+    }
+
+    // SignalR event handlers
+    private async Task OnOpponentJoined()
+    {
+        await InvokeAsync(() =>
+        {
+            Console.WriteLine("[SignalR] OpponentJoined event received");
+            _opponentJoined = true;
+            StateHasChanged();
+        });
+    }
+
+    private async Task OnOpponentReadyReceived()
+    {
+        await InvokeAsync(() =>
+        {
+            Console.WriteLine("[SignalR] OpponentReady event received");
+            _opponentReady = true;
+            StateHasChanged();
+        });
+    }
+
+    private async Task OnGameStarted(string currentPlayerConnectionId)
+    {
+        await InvokeAsync(() =>
+        {
+            Console.WriteLine($"[SignalR] GameStarted event received. Current player: {currentPlayerConnectionId}");
+            _onlinePhase = Phase.Playing;
+            _isMyTurn = currentPlayerConnectionId == _hubConnection?.ConnectionId;
+            Console.WriteLine($"[SignalR] Is my turn: {_isMyTurn}");
+            StateHasChanged();
+        });
+    }
+
+    private async Task OnShotFired(ShotData data)
+    {
+        await InvokeAsync(() =>
+        {
+            Console.WriteLine($"[SignalR] ShotFired event received. Shooter: {data.Shooter}, Position: {data.Position}, Result: {data.Result}");
+            var isMyShot = data.Shooter == _hubConnection?.ConnectionId;
+
+            if (isMyShot)
+            {
+                // Update opponent board
+                if (data.Result == ShotResult.Sunk && data.SunkShipPositions != null)
+                {
+                    foreach (var pos in data.SunkShipPositions)
+                    {
+                        var cell = _opponentBoard[pos.Row, pos.Col];
+                        cell.Status = CellStatus.Sunk;
+                    }
+                    Console.WriteLine($"[SignalR] Marked {data.SunkShipPositions.Count} cells as sunk on opponent board");
+                }
+                else
+                {
+                    var cell = _opponentBoard[data.Position.Row, data.Position.Col];
+                    cell.Status = data.Result switch
+                    {
+                        ShotResult.Miss => CellStatus.Miss,
+                        ShotResult.Hit => CellStatus.Hit,
+                        _ => cell.Status
+                    };
+                    Console.WriteLine($"[SignalR] Updated opponent board at {data.Position} to {cell.Status}");
+                }
+                _lastShot = $"{data.Position}: {data.Result}";
+            }
+            else
+            {
+                // Update my board
+                if (data.Result == ShotResult.Sunk && data.SunkShipPositions != null)
+                {
+                    foreach (var pos in data.SunkShipPositions)
+                    {
+                        var cell = _myBoard[pos.Row, pos.Col];
+                        cell.Status = CellStatus.Sunk;
+                    }
+                    Console.WriteLine($"[SignalR] Marked {data.SunkShipPositions.Count} cells as sunk on my board");
+                }
+                else
+                {
+                    var cell = _myBoard[data.Position.Row, data.Position.Col];
+                    cell.Status = data.Result switch
+                    {
+                        ShotResult.Miss => CellStatus.Miss,
+                        ShotResult.Hit => CellStatus.Hit,
+                        _ => cell.Status
+                    };
+                    Console.WriteLine($"[SignalR] Updated my board at {data.Position} to {cell.Status}");
+                }
+            }
+
+            _isMyTurn = data.NextPlayer == _hubConnection?.ConnectionId;
+            Console.WriteLine($"[SignalR] Turn updated. Is my turn: {_isMyTurn}");
+
+            if (data.GamePhase == Phase.Finished)
+            {
+                _onlinePhase = Phase.Finished;
+                _winner = data.Winner;
+                Console.WriteLine($"[SignalR] Game finished. Winner: {_winner}");
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    private async Task OnSalvoFired(SalvoData data)
+    {
+        await InvokeAsync(() =>
+        {
+            Console.WriteLine($"[SignalR] SalvoFired event received. Shooter: {data.Shooter}");
+            var isMyShot = data.Shooter == _hubConnection?.ConnectionId;
+            var board = isMyShot ? _opponentBoard : _myBoard;
+
+            _isMyTurn = data.NextPlayer == _hubConnection?.ConnectionId;
+
+            if (data.GamePhase == Phase.Finished)
+            {
+                _onlinePhase = Phase.Finished;
+                _winner = data.Winner;
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    private async Task OnPlayerSurrendered(string connectionId)
+    {
+        await InvokeAsync(() =>
+        {
+            Console.WriteLine($"[SignalR] PlayerSurrendered event received. ConnectionId: {connectionId}");
+            _onlinePhase = Phase.Finished;
+            _winner = connectionId == _hubConnection?.ConnectionId ? "Opponent" : "You";
+            StateHasChanged();
+        });
+    }
+
+    private async Task OnDrawProposed()
+    {
+        await InvokeAsync(() =>
+        {
+            Console.WriteLine("[SignalR] DrawProposed event received");
+            _errorMessage = "Opponent proposed a draw. Accept or decline?";
+            StateHasChanged();
+        });
+    }
+
+    private async Task OnDrawAccepted()
+    {
+        await InvokeAsync(() =>
+        {
+            Console.WriteLine("[SignalR] DrawAccepted event received");
+            _onlinePhase = Phase.Finished;
+            _winner = null;
+            StateHasChanged();
+        });
+    }
+
+    private async Task OnPlayerDisconnected(string connectionId)
+    {
+        await InvokeAsync(() =>
+        {
+            Console.WriteLine($"[SignalR] PlayerDisconnected event received. ConnectionId: {connectionId}");
+            _errorMessage = "Opponent disconnected.";
+            StateHasChanged();
+        });
+    }
+
+    private void ReturnToLobby()
+    {
+        _gameId = null;
+        _joinGameId = null;
+        _onlinePhase = Phase.Preparation;
+        _myBoard = new Board(10);
+        _opponentBoard = new Board(10);
+        _isReady = false;
+        _opponentReady = false;
+        _opponentJoined = false;
+        _errorMessage = null;
+        StateHasChanged();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection is not null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
+    }
+
+    // Data transfer objects for SignalR events
+    private record ShotData(string Shooter, Position Position, ShotResult Result, Phase GamePhase, string? Winner, string? NextPlayer, List<Position>? SunkShipPositions);
+    private record SalvoData(string Shooter, Position CenterPosition, List<ShotResult> Results, Phase GamePhase, string? Winner, string? NextPlayer);
 }

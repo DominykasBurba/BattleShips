@@ -1,0 +1,418 @@
+@page "/game"
+@rendermode InteractiveServer
+@using BattleShips.Domain
+@inject BattleShips.Services.GameService GameService
+@inject NavigationManager Nav
+
+<style>
+    .status-bar {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.07);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .status-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .status-label {
+        font-weight: 600;
+        color: #4a5568;
+    }
+
+    .status-value {
+        color: #667eea;
+        font-weight: 700;
+    }
+
+    .status-value.your-turn {
+        color: #48bb78;
+        animation: pulse 2s infinite;
+    }
+
+    .status-value.opponent-turn {
+        color: #f6ad55;
+    }
+
+    @@keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+    }
+
+    .settings-panel {
+        background: white;
+        border-radius: 12px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.07);
+    }
+
+    .settings-row {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .settings-label {
+        font-weight: 500;
+        color: #4a5568;
+        min-width: 120px;
+    }
+
+    .custom-select {
+        border-radius: 8px;
+        border: 2px solid #e2e8f0;
+        padding: 0.5rem 1rem;
+        font-size: 1rem;
+        transition: all 0.2s;
+    }
+
+    .custom-select:focus {
+        border-color: #667eea;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .btn-modern {
+        border-radius: 8px;
+        padding: 0.75rem 2rem;
+        font-weight: 600;
+        border: none;
+        transition: all 0.3s;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .btn-modern:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+    }
+
+    .btn-primary-modern {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .btn-secondary-modern {
+        background: linear-gradient(135deg, #a0aec0 0%, #718096 100%);
+        color: white;
+    }
+
+    .btn-danger-modern {
+        background: linear-gradient(135deg, #fc8181 0%, #f56565 100%);
+        color: white;
+    }
+
+    .btn-success-modern {
+        background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+        color: white;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .winner-banner {
+        background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+        border-radius: 16px;
+        padding: 3rem 2rem;
+        text-align: center;
+        color: white;
+        box-shadow: 0 10px 40px rgba(72, 187, 120, 0.3);
+        margin-bottom: 2rem;
+    }
+
+    .winner-banner h2 {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+    }
+
+    .winner-banner p {
+        font-size: 1.3rem;
+        opacity: 0.95;
+    }
+
+    @@media (max-width: 768px) {
+        .status-bar {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+    }
+</style>
+
+@if (GameService.Session != null)
+{
+    <!-- STATUS BAR -->
+    <div class="status-bar">
+        <div class="status-item">
+            <span class="status-label">Phase:</span>
+            <span class="status-value">
+                @if (GameService.Session.Phase == Phase.Preparation) { <text>Preparation</text> }
+                else if (GameService.Session.Phase == Phase.Playing) { <text>Battle</text> }
+                else { <text>Finished</text> }
+            </span>
+        </div>
+        @if (GameService.Session.Phase == Phase.Playing)
+        {
+            <div class="status-item">
+                <span class="status-label">Turn:</span>
+                <span class="status-value @(ReferenceEquals(GameService.Session.Current, GameService.Session.P1) ? "your-turn" : "opponent-turn")">
+                    @(ReferenceEquals(GameService.Session.Current, GameService.Session.P1) ? "Your Turn" : "Bot's Turn")
+                </span>
+            </div>
+        }
+        @if (GameService.Session.Phase == Phase.Finished)
+        {
+            <div class="status-item">
+                <span class="status-label">Winner:</span>
+                <span class="status-value">@(GameService.Session.Winner?.Name ?? "Draw")</span>
+            </div>
+        }
+        <div class="status-item ms-auto">
+            <button class="btn btn-modern btn-secondary-modern" style="padding: 0.5rem 1rem;" @onclick="BackToLobby">
+                Back to Lobby
+            </button>
+        </div>
+    </div>
+
+    <!-- PREPARATION -->
+    @if (GameService.Session.Phase == Phase.Preparation)
+{
+    <div class="row g-3">
+        <div class="col-md-6">
+            <div class="d-flex align-items-start gap-3">
+                <div>
+                    <h5>You — place fleet</h5>
+                    <PlacementBoard Board="@GameService.Session.P1.Board"
+                                   OnShipPlaced="OnShipPlaced"
+                                   SelectedShip="_selectedShip" />
+                    <div class="mt-2 action-buttons">
+                        <button class="btn btn-modern btn-secondary-modern" @onclick="() => GameService.RandomizeFor(GameService.Session.P1)">Randomize</button>
+                        <button class="btn btn-modern btn-danger-modern" @onclick="GameService.ResetShips">Reset</button>
+                    </div>
+                </div>
+                <div class="d-flex flex-column gap-3">
+                    <ShipInventory Board="@GameService.Session.P1.Board"
+                                 OnShipPlaced="OnShipPlaced"
+                                 OnShipSelected="OnShipSelected" />
+                    <ShipStatus Title="Your Fleet" Board="@GameService.Session.P1.Board" />
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="d-flex align-items-start gap-3">
+                <div>
+                    <h5>Enemy (bot)</h5>
+                    <div class="alert alert-info">Bot fleet is ready (hidden).</div>
+                    <button class="btn btn-modern btn-secondary-modern" @onclick="() => GameService.RandomizeFor(GameService.Session.P2)">Re-roll bot fleet</button>
+                </div>
+                <ShipStatus Title="Enemy Fleet" Board="@GameService.Session.P2.Board" />
+            </div>
+        </div>
+    </div>
+
+    <div class="settings-panel mt-3">
+        <div class="settings-row">
+            <span class="settings-label">Shoot Mode:</span>
+            <select class="custom-select" @onchange="OnShootingModeChanged">
+                <option value="Single">Normal (1 per turn)</option>
+                <option value="Salvo2">Salvo (2 per turn)</option>
+                <option value="Salvo3x3">3x3 Area Shot</option>
+            </select>
+        </div>
+        <div style="text-align: center;">
+            <button class="btn btn-modern btn-success-modern" @onclick="StartGame" disabled="@(!_canStart)">Start Battle</button>
+            @if (!string.IsNullOrEmpty(_startHint))
+            {
+                <div class="text-muted mt-2" style="font-size: 0.9rem;">@_startHint</div>
+            }
+        </div>
+    </div>
+}
+
+else if (GameService.Session.Phase == Phase.Playing)
+{
+    var canShoot = ReferenceEquals(GameService.Session.Current, GameService.Session.P1);
+
+    <div class="row g-3">
+        <div class="col-md-6">
+            <div class="d-flex align-items-start gap-3">
+                <div>
+                    <h5>You</h5>
+                    <BattleBoard Board="@GameService.Session.P1.Board" Own="true" Interactable="false" OnFire="null" />
+                </div>
+                <ShipStatus Title="Your Ships" Board="@GameService.Session.P1.Board" />
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="d-flex align-items-start gap-3">
+                <div>
+                    <h5>Enemy (bot)</h5>
+                    <BattleBoard Board="@GameService.Session.P2.Board"
+                                 Own="false"
+                                 Interactable="@canShoot"
+                                 OnFire="OnFireAtEnemy" />
+                    @if (!canShoot)
+                    {
+                        <small class="text-muted">Wait for your turn…</small>
+                    }
+                </div>
+                <ShipStatus Title="Enemy Ships" Board="@GameService.Session.P2.Board" />
+            </div>
+        </div>
+    </div>
+
+    <!-- ACTIONS -->
+    <ControlsBar
+        OnSurrender="() => GameService.Surrender(GameService.Session.P1)"
+        OnRequestDraw="() => GameService.ProposeDraw(GameService.Session.P1)"
+        OnAcceptDraw="() => GameService.AcceptDraw(GameService.Session.P1)" />
+
+    <div class="mt-3">
+        <strong>Last shot:</strong> @_last
+    </div>
+}
+    else if (GameService.Session.Phase == Phase.Finished)
+    {
+        <div class="winner-banner">
+            <h2>Game Over!</h2>
+            <p>Winner: @(GameService.Session.Winner?.Name ?? "It's a Draw!")</p>
+        </div>
+        <div style="text-align: center;">
+            <button class="btn btn-modern btn-primary-modern" @onclick="BackToLobby">Back to Lobby</button>
+        </div>
+    }
+}
+
+@code {
+    private string _last = "—";
+    private bool _canStart;
+    private string _startHint = "Randomize your fleet. Bot fleet is hidden.";
+    private ShipKind? _selectedShip;
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "size")]
+    public int? BoardSize { get; set; }
+
+    protected override void OnInitialized()
+    {
+        // If no session exists, create one from query parameter
+        if (GameService.Session == null)
+        {
+            int size = BoardSize ?? 10; // Default to 10 if no parameter
+            GameService.NewLocalSession(size, enemyIsAi: true);
+
+            if (GameService.Session != null)
+            {
+                // Randomize both fleets to get started
+                GameService.RandomizeFor(GameService.Session.P1);
+                GameService.RandomizeFor(GameService.Session.P2);
+            }
+            else
+            {
+                // If still null, redirect to home
+                Nav.NavigateTo("/");
+                return;
+            }
+        }
+    }
+
+    private void StartGame()
+    {
+        if (GameService.Start())
+            StateHasChanged();
+        else
+            _startHint = "Both fleets must be complete and valid (no touching).";
+    }
+
+    private void OnShootingModeChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<ShootingMode>(e.Value?.ToString(), out var mode))
+        {
+            GameService.SetShootingMode(mode);
+
+            if (mode == ShootingMode.Salvo2)
+                GameService.SetShotsPerTurn(2);
+            else
+                GameService.SetShotsPerTurn(1);
+        }
+    }
+
+    private async Task OnFireAtEnemy(Position p)
+    {
+        if (GameService.Session is null || GameService.Session.Phase != Phase.Playing) return;
+
+        if (GameService.ShootingMode == ShootingMode.Salvo3x3)
+        {
+            var results = GameService.Fire3x3Salvo(p);
+            var hitCount = results.Count(r => r is ShotResult.Hit or ShotResult.Sunk);
+            var totalShots = results.Count;
+            _last = $"3x3 Salvo at {p}: {hitCount}/{totalShots} hits";
+
+            if (GameService.Session.Phase == Phase.Playing)
+            {
+                GameService.Session.EndTurn();
+
+                if (GameService.Session.Current.Kind == PlayerKind.AI)
+                {
+                    await Task.Delay(500);
+                    GameService.HandleAiTurn();
+                    StateHasChanged();
+                }
+            }
+        }
+        else
+        {
+            var result = GameService.FireAt(p);
+            _last = $"{p}: {result}";
+        }
+
+        StateHasChanged();
+
+        if (GameService.ShootingMode != ShootingMode.Salvo3x3)
+        {
+            await Task.Delay(250);
+            StateHasChanged();
+        }
+    }
+
+    private void OnShipPlaced(ShipKind shipKind)
+    {
+        _selectedShip = null;
+        StateHasChanged();
+    }
+
+    private void OnShipSelected(ShipKind? shipKind)
+    {
+        _selectedShip = shipKind;
+        StateHasChanged();
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (GameService.Session is not null && GameService.Session.Phase == Phase.Preparation)
+        {
+            _canStart = GameService.Session.P1.Board.Ships.Count > 0 &&
+                        GameService.Session.P2.Board.Ships.Count > 0;
+        }
+    }
+
+    private void BackToLobby()
+    {
+        GameService.ClearSession();
+        Nav.NavigateTo("/");
+    }
+}

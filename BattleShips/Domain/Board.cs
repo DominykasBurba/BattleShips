@@ -100,16 +100,15 @@ public class Board
 
         if (cell.Status == CellStatus.Ship && cell.Ship is not null)
         {
+            var ship = cell.Ship;
             cell.Status = CellStatus.Hit;
-            cell.Ship.RegisterHit(p);
+            ship.RegisterHit(p);
 
-            if (cell.Ship.IsSunk)
-            {
-                foreach (var seg in cell.Ship.Cells())
-                    this[seg].Status = CellStatus.Sunk;
-                return ShotResult.Sunk;
-            }
-            return ShotResult.Hit;
+            if (!ship.IsSunk) return ShotResult.Hit;
+            
+            foreach (var seg in ship.Cells())
+                this[seg].Status = CellStatus.Sunk;
+            return ShotResult.Sunk;
         }
         cell.Status = CellStatus.Miss;
         return ShotResult.Miss;

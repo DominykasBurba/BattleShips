@@ -1,0 +1,548 @@
+@page "/online"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.SignalR.Client
+@using BattleShips.Domain
+@using BattleShips.Hubs
+@inject NavigationManager Nav
+@implements IAsyncDisposable
+
+<h3 class="mb-3">Online Battleships</h3>
+
+@if (_hubConnection == null || _hubConnection.State == HubConnectionState.Disconnected)
+{
+    <div class="alert alert-info">
+        Connecting to server...
+    </div>
+}
+else if (_gameId == null)
+{
+    <!-- LOBBY: Create or Join Game -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5>Create New Game</h5>
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <label class="form-label mb-0">Board size:</label>
+                <select class="form-select w-auto" @bind="_size">
+                    @foreach (var s in _sizes)
+                    {
+                        <option value="@s">@s×@s</option>
+                    }
+                </select>
+                <button class="btn btn-primary" @onclick="CreateGame">Create Game</button>
+            </div>
+
+            <hr />
+
+            <h5>Join Existing Game</h5>
+            <div class="d-flex align-items-center gap-3">
+                <input class="form-control w-auto" placeholder="Game Code" @bind="_joinGameId" />
+                <button class="btn btn-success" @onclick="JoinGame">Join Game</button>
+            </div>
+        </div>
+    </div>
+}
+else if (_phase == Phase.Preparation)
+{
+    <!-- SHIP PLACEMENT -->
+    <div class="alert alert-info mb-3">
+        <strong>Game Code:</strong> <code>@_gameId</code> - Share this with your opponent!
+        @if (!_opponentJoined)
+        {
+            <div>Waiting for opponent to join...</div>
+        }
+        else if (_opponentReady && !_isReady)
+        {
+            <div>Opponent is ready! Place your ships and click Ready.</div>
+        }
+        else if (!_opponentReady && _isReady)
+        {
+            <div>Waiting for opponent to place ships...</div>
+        }
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-6">
+            <div class="d-flex align-items-start gap-3">
+                <div>
+                    <h5>Your Fleet</h5>
+                    <PlacementBoard Board="@_myBoard"
+                                   OnShipPlaced="OnShipPlaced"
+                                   SelectedShip="_selectedShip" />
+                    <div class="mt-2">
+                        <button class="btn btn-secondary me-2" @onclick="RandomizeFleet">Randomize</button>
+                        <button class="btn btn-outline-secondary me-2" @onclick="ResetFleet">Reset</button>
+                        <button class="btn btn-success" @onclick="MarkReady" disabled="@(!CanMarkReady())">Ready!</button>
+                    </div>
+                </div>
+                <div class="d-flex flex-column gap-3">
+                    <ShipInventory Board="@_myBoard"
+                                 OnShipPlaced="OnShipPlaced"
+                                 OnShipSelected="OnShipSelected" />
+                    <ShipStatus Title="Your Fleet" Board="@_myBoard" />
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <h5>Opponent</h5>
+            @if (!_opponentJoined)
+            {
+                <div class="alert alert-warning">Waiting for opponent...</div>
+            }
+            else
+            {
+                <div class="alert alert-info">
+                    Opponent is @(_opponentReady ? "ready!" : "placing ships...")
+                </div>
+            }
+        </div>
+    </div>
+}
+else if (_phase == Phase.Playing)
+{
+    <!-- BATTLE PHASE -->
+    <div class="mb-2">
+        <strong>Phase:</strong> Playing
+        <span class="ms-3"><strong>Turn:</strong> @(_isMyTurn ? "Your turn" : "Opponent's turn")</span>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-6">
+            <div class="d-flex align-items-start gap-3">
+                <div>
+                    <h5>Your Board</h5>
+                    <BattleBoard Board="@_myBoard" Own="true" Interactable="false" OnFire="null" />
+                </div>
+                <ShipStatus Title="Your Ships" Board="@_myBoard" />
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="d-flex align-items-start gap-3">
+                <div>
+                    <h5>Enemy Board</h5>
+                    <BattleBoard Board="@_opponentBoard"
+                                 Own="false"
+                                 Interactable="@_isMyTurn"
+                                 OnFire="OnFireAtEnemy" />
+                    @if (!_isMyTurn)
+                    {
+                        <small class="text-muted">Wait for your turn...</small>
+                    }
+                </div>
+                <ShipStatus Title="Enemy Ships" Board="@_opponentBoard" />
+            </div>
+        </div>
+    </div>
+
+    <ControlsBar
+        OnSurrender="OnSurrender"
+        OnRequestDraw="OnRequestDraw"
+        OnAcceptDraw="OnAcceptDraw" />
+
+    <div class="mt-3">
+        <strong>Last shot:</strong> @_lastShot
+    </div>
+}
+else if (_phase == Phase.Finished)
+{
+    <!-- GAME OVER -->
+    <div class="alert alert-success">
+        <h4>Game Over!</h4>
+        <p><strong>Winner:</strong> @(_winner ?? "Draw")</p>
+    </div>
+    <button class="btn btn-primary" @onclick="ReturnToLobby">Back to Lobby</button>
+}
+
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div class="alert alert-danger mt-3">@_errorMessage</div>
+}
+
+@code {
+    private HubConnection? _hubConnection;
+    private string? _gameId;
+    private string? _joinGameId;
+    private int _size = 10;
+    private readonly int[] _sizes = new[] { 8, 10, 12 };
+
+    private Board _myBoard = new(10);
+    private Board _opponentBoard = new(10);
+    private Phase _phase = Phase.Preparation;
+    private bool _isMyTurn;
+    private bool _isReady;
+    private bool _opponentReady;
+    private bool _opponentJoined;
+    private string? _winner;
+    private string? _errorMessage;
+    private string _lastShot = "—";
+    private ShipKind? _selectedShip;
+
+    private readonly PlacementService _placementService = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Initialize SignalR connection
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(Nav.ToAbsoluteUri("/gamehub"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        // Register event handlers
+        _hubConnection.On("OpponentJoined", OnOpponentJoined);
+        _hubConnection.On("OpponentReady", OnOpponentReadyReceived);
+        _hubConnection.On<string>("GameStarted", OnGameStarted);
+        _hubConnection.On<ShotData>("ShotFired", OnShotFired);
+        _hubConnection.On<SalvoData>("SalvoFired", OnSalvoFired);
+        _hubConnection.On<string>("PlayerSurrendered", OnPlayerSurrendered);
+        _hubConnection.On("DrawProposed", OnDrawProposed);
+        _hubConnection.On("DrawAccepted", OnDrawAccepted);
+        _hubConnection.On<string>("PlayerDisconnected", OnPlayerDisconnected);
+
+        await _hubConnection.StartAsync();
+    }
+
+    private async Task CreateGame()
+    {
+        if (_hubConnection == null) return;
+
+        try
+        {
+            _gameId = await _hubConnection.InvokeAsync<string>("CreateGame", _size);
+            _myBoard = new Board(_size);
+            _opponentBoard = new Board(_size);
+            _phase = Phase.Preparation;
+            _opponentJoined = false;
+            _isReady = false;
+            _opponentReady = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to create game: {ex.Message}";
+        }
+    }
+
+    private async Task JoinGame()
+    {
+        if (_hubConnection == null || string.IsNullOrEmpty(_joinGameId)) return;
+
+        try
+        {
+            var success = await _hubConnection.InvokeAsync<bool>("JoinGame", _joinGameId);
+            if (success)
+            {
+                _gameId = _joinGameId;
+                // Note: The joiner sets _opponentJoined to true because from their perspective,
+                // the game creator (opponent) has already joined
+                _opponentJoined = true;
+                _isReady = false;
+                _opponentReady = false;
+                StateHasChanged();
+            }
+            else
+            {
+                _errorMessage = "Failed to join game. Game may be full or not exist.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to join game: {ex.Message}";
+        }
+    }
+
+    private void RandomizeFleet()
+    {
+        _placementService.RandomizeFleet(_myBoard);
+        StateHasChanged();
+    }
+
+    private void ResetFleet()
+    {
+        _myBoard.Clear();
+        _isReady = false;
+        StateHasChanged();
+    }
+
+    private bool CanMarkReady()
+    {
+        var expected = new[] { 4, 3, 3, 2, 2, 2, 1, 1, 1, 1 }.OrderBy(x => x).ToArray();
+        var actual = _myBoard.Ships.Select(s => s.Length).OrderBy(x => x).ToArray();
+        return expected.SequenceEqual(actual);
+    }
+
+    private async Task MarkReady()
+    {
+        if (_hubConnection == null || _gameId == null || !CanMarkReady()) return;
+
+        try
+        {
+            var placements = _myBoard.Ships.Select(ship =>
+            {
+                var cells = ship.Cells().OrderBy(p => p.Row).ThenBy(p => p.Col).ToList();
+                var start = cells.First();
+                var isHorizontal = cells.Count > 1 && cells[0].Row == cells[1].Row;
+                return new ShipPlacement(ship.Kind, start, isHorizontal);
+            }).ToList();
+
+            await _hubConnection.InvokeAsync("PlaceShips", _gameId, placements);
+            _isReady = true;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to mark ready: {ex.Message}";
+        }
+    }
+
+    private async Task OnFireAtEnemy(Position pos)
+    {
+        if (_hubConnection == null || _gameId == null || !_isMyTurn) return;
+
+        try
+        {
+            await _hubConnection.InvokeAsync("FireShot", _gameId, pos);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to fire: {ex.Message}";
+        }
+    }
+
+    private async Task OnSurrender()
+    {
+        if (_hubConnection == null || _gameId == null) return;
+        await _hubConnection.InvokeAsync("Surrender", _gameId);
+    }
+
+    private async Task OnRequestDraw()
+    {
+        if (_hubConnection == null || _gameId == null) return;
+        await _hubConnection.InvokeAsync("ProposeDraw", _gameId);
+    }
+
+    private async Task OnAcceptDraw()
+    {
+        if (_hubConnection == null || _gameId == null) return;
+        await _hubConnection.InvokeAsync("AcceptDraw", _gameId);
+    }
+
+    // SignalR event handlers
+    private async Task OnOpponentJoined()
+    {
+        await InvokeAsync(() =>
+        {
+            Console.WriteLine("[SignalR] OpponentJoined event received");
+            _opponentJoined = true;
+            StateHasChanged();
+        });
+    }
+
+    private async Task OnOpponentReadyReceived()
+    {
+        await InvokeAsync(() =>
+        {
+            Console.WriteLine("[SignalR] OpponentReady event received");
+            _opponentReady = true;
+            StateHasChanged();
+        });
+    }
+
+    private async Task OnGameStarted(string currentPlayerConnectionId)
+    {
+        await InvokeAsync(() =>
+        {
+            Console.WriteLine($"[SignalR] GameStarted event received. Current player: {currentPlayerConnectionId}");
+            _phase = Phase.Playing;
+            // Set whose turn it is
+            _isMyTurn = currentPlayerConnectionId == _hubConnection?.ConnectionId;
+            Console.WriteLine($"[SignalR] Is my turn: {_isMyTurn}");
+            StateHasChanged();
+        });
+    }
+
+    private async Task OnShotFired(ShotData data)
+    {
+        await InvokeAsync(() =>
+        {
+            Console.WriteLine($"[SignalR] ShotFired event received. Shooter: {data.Shooter}, Position: {data.Position}, Result: {data.Result}");
+            var isMyShot = data.Shooter == _hubConnection?.ConnectionId;
+
+            if (isMyShot)
+            {
+                // Update opponent board
+                // If ship was sunk, mark all its positions
+                if (data.Result == ShotResult.Sunk && data.SunkShipPositions != null)
+                {
+                    foreach (var pos in data.SunkShipPositions)
+                    {
+                        var cell = _opponentBoard[pos.Row, pos.Col];
+                        cell.Status = CellStatus.Sunk;
+                    }
+                    Console.WriteLine($"[SignalR] Marked {data.SunkShipPositions.Count} cells as sunk on opponent board");
+                }
+                else
+                {
+                    // Regular shot
+                    var cell = _opponentBoard[data.Position.Row, data.Position.Col];
+                    cell.Status = data.Result switch
+                    {
+                        ShotResult.Miss => CellStatus.Miss,
+                        ShotResult.Hit => CellStatus.Hit,
+                        _ => cell.Status
+                    };
+                    Console.WriteLine($"[SignalR] Updated opponent board at {data.Position} to {cell.Status}");
+                }
+                _lastShot = $"{data.Position}: {data.Result}";
+            }
+            else
+            {
+                // Update my board
+                // If ship was sunk, mark all its positions
+                if (data.Result == ShotResult.Sunk && data.SunkShipPositions != null)
+                {
+                    foreach (var pos in data.SunkShipPositions)
+                    {
+                        var cell = _myBoard[pos.Row, pos.Col];
+                        cell.Status = CellStatus.Sunk;
+                    }
+                    Console.WriteLine($"[SignalR] Marked {data.SunkShipPositions.Count} cells as sunk on my board");
+                }
+                else
+                {
+                    // Regular shot
+                    var cell = _myBoard[data.Position.Row, data.Position.Col];
+                    cell.Status = data.Result switch
+                    {
+                        ShotResult.Miss => CellStatus.Miss,
+                        ShotResult.Hit => CellStatus.Hit,
+                        _ => cell.Status
+                    };
+                    Console.WriteLine($"[SignalR] Updated my board at {data.Position} to {cell.Status}");
+                }
+            }
+
+            // Update turn
+            _isMyTurn = data.NextPlayer == _hubConnection?.ConnectionId;
+            Console.WriteLine($"[SignalR] Turn updated. Is my turn: {_isMyTurn}");
+
+            // Check if game finished
+            if (data.GamePhase == Phase.Finished)
+            {
+                _phase = Phase.Finished;
+                _winner = data.Winner;
+                Console.WriteLine($"[SignalR] Game finished. Winner: {_winner}");
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    private async Task OnSalvoFired(SalvoData data)
+    {
+        await InvokeAsync(() =>
+        {
+            Console.WriteLine($"[SignalR] SalvoFired event received. Shooter: {data.Shooter}");
+            var isMyShot = data.Shooter == _hubConnection?.ConnectionId;
+            var board = isMyShot ? _opponentBoard : _myBoard;
+
+            // Apply all shot results
+            for (int i = 0; i < data.Results.Count; i++)
+            {
+                var result = data.Results[i];
+                // Calculate position based on 3x3 pattern from center
+                // This is simplified - you may need to track actual positions
+            }
+
+            _isMyTurn = data.NextPlayer == _hubConnection?.ConnectionId;
+
+            if (data.GamePhase == Phase.Finished)
+            {
+                _phase = Phase.Finished;
+                _winner = data.Winner;
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    private async Task OnPlayerSurrendered(string connectionId)
+    {
+        await InvokeAsync(() =>
+        {
+            Console.WriteLine($"[SignalR] PlayerSurrendered event received. ConnectionId: {connectionId}");
+            _phase = Phase.Finished;
+            _winner = connectionId == _hubConnection?.ConnectionId ? "Opponent" : "You";
+            StateHasChanged();
+        });
+    }
+
+    private async Task OnDrawProposed()
+    {
+        await InvokeAsync(() =>
+        {
+            Console.WriteLine("[SignalR] DrawProposed event received");
+            _errorMessage = "Opponent proposed a draw. Accept or decline?";
+            StateHasChanged();
+        });
+    }
+
+    private async Task OnDrawAccepted()
+    {
+        await InvokeAsync(() =>
+        {
+            Console.WriteLine("[SignalR] DrawAccepted event received");
+            _phase = Phase.Finished;
+            _winner = null;
+            StateHasChanged();
+        });
+    }
+
+    private async Task OnPlayerDisconnected(string connectionId)
+    {
+        await InvokeAsync(() =>
+        {
+            Console.WriteLine($"[SignalR] PlayerDisconnected event received. ConnectionId: {connectionId}");
+            _errorMessage = "Opponent disconnected.";
+            StateHasChanged();
+        });
+    }
+
+    private void ReturnToLobby()
+    {
+        _gameId = null;
+        _joinGameId = null;
+        _phase = Phase.Preparation;
+        _myBoard = new Board(10);
+        _opponentBoard = new Board(10);
+        _isReady = false;
+        _opponentReady = false;
+        _opponentJoined = false;
+        _errorMessage = null;
+        StateHasChanged();
+    }
+
+    private void OnShipPlaced(ShipKind shipKind)
+    {
+        _selectedShip = null;
+        StateHasChanged();
+    }
+
+    private void OnShipSelected(ShipKind? shipKind)
+    {
+        _selectedShip = shipKind;
+        StateHasChanged();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection is not null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
+    }
+
+    // Data transfer objects for SignalR events
+    private record ShotData(string Shooter, Position Position, ShotResult Result, Phase GamePhase, string? Winner, string? NextPlayer, List<Position>? SunkShipPositions);
+    private record SalvoData(string Shooter, Position CenterPosition, List<ShotResult> Results, Phase GamePhase, string? Winner, string? NextPlayer);
+}

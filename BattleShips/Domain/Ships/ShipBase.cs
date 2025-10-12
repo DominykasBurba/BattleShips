@@ -33,4 +33,13 @@ public abstract class ShipBase
 
     public virtual void RegisterHit(Position p) => _hits.Add(p);
     public virtual bool IsSunk => _hits.Count >= Length;
+
+    public ShipKind Kind => this switch
+    {
+        Battleship => ShipKind.Battleship,
+        Submarine => ShipKind.Submarine,
+        Destroyer => ShipKind.Destroyer,
+        Cruiser => ShipKind.Cruiser,
+        _ => throw new InvalidOperationException("Unknown ship type")
+    };
 }

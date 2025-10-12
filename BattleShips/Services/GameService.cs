@@ -32,6 +32,12 @@ public class GameService
         _shotsUsedThisTurn = 0;
     }
 
+    public void ClearSession()
+    {
+        Session = null;
+        _shotsUsedThisTurn = 0;
+    }
+
     public void RandomizeFor(Player who)
     {
         if (Session is null) return;

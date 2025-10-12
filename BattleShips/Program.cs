@@ -6,10 +6,13 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+builder.Services.AddSignalR();
+
 // your DI
 builder.Services.AddSingleton<BattleShips.Services.PlacementService>();
-builder.Services.AddSingleton<BattleShips.Services.GameService>();
+builder.Services.AddScoped<BattleShips.Services.GameService>();
 builder.Services.AddSingleton<BattleShips.Services.ChatService>();
+builder.Services.AddSingleton<BattleShips.Services.GameLobbyService>();
 
 var app = builder.Build();
 
@@ -27,5 +30,7 @@ app.MapStaticAssets();
 // 👇 This must be the ONLY UI host mapping
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+app.MapHub<BattleShips.Hubs.GameHub>("/gamehub");
 
 app.Run();
