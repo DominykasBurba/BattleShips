@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using BattleShips.Domain;
 using BattleShips.Domain.AttackStrategies;
+using BattleShips.Domain.BoardBuilder;
 using BattleShips.Hubs;
 
 namespace BattleShips.Services;
@@ -42,15 +43,15 @@ public class GameLobbyService(PlacementService placementService)
         if (player == null)
             return false;
 
-        // Clear existing ships
-        player.Board.Clear();
-
-        // Place ships
+        // Use Builder pattern: ManualFleetBuilder for manual ship placement
+        var builder = new ManualFleetBuilder(player.Board);
+        
+        // Place each ship using the builder
         foreach (var placement in ships)
         {
             var orientation = placement.IsHorizontal ? Orientation.Horizontal : Orientation.Vertical;
-            var ship = ShipFactory.Create(placement.Kind, placement.Start, orientation);
-            player.Board.Place(ship);
+            if (!builder.TryBuildPart(placement.Kind, placement.Start, orientation))
+                return false; // Failed to place a ship
         }
 
         // Mark player as ready

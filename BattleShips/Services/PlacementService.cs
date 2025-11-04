@@ -1,35 +1,33 @@
 using BattleShips.Domain;
+using BattleShips.Domain.BoardBuilder;
 using BattleShips.Domain.Ships;
 
 namespace BattleShips.Services;
 
 public class PlacementService
 {
-    private readonly Random _rng = new();
+    private readonly FleetDirector _director = new();
 
+    /// <summary>
+    /// Randomizes a fleet on the given board using the Builder pattern.
+    /// Uses FleetDirector with RandomFleetBuilder to construct the fleet.
+    /// </summary>
     public void RandomizeFleet(Board board)
     {
-        board.Clear();
-        foreach (var kind in DefaultFleet.Composition)
-        {
-            bool placed = false;
-            for (int tries = 0; tries < 300 && !placed; tries++)
-            {
-                var o = _rng.Next(2) == 0 ? Orientation.Horizontal : Orientation.Vertical;
-                var length = ShipFactory.Create(kind, new Position(0,0), o).Length;
-                var maxR = o == Orientation.Horizontal ? board.Size : board.Size - length + 1;
-                var maxC = o == Orientation.Horizontal ? board.Size - length + 1 : board.Size;
-                var start = new Position(_rng.Next(maxR), _rng.Next(maxC));
-
-                var ship = ShipFactory.Create(kind, start, o);
-                placed = board.Place(ship);
-            }
-            if (!placed) throw new InvalidOperationException("Failed to place fleet randomly.");
-        }
+        // Use Builder pattern: Director orchestrates construction with Random builder
+        var builder = new RandomFleetBuilder(board);
+        _director.SetBuilder(builder);
+        _director.Construct(); // Director calls BuildPart() for each ship in fleet composition
     }
 
+    /// <summary>
+    /// Attempts to place a ship on the board.
+    /// </summary>
     public bool TryPlace(Board board, ShipBase ship) => board.Place(ship);
 
+    /// <summary>
+    /// Attempts to rotate a ship on the board.
+    /// </summary>
     public bool TryRotate(Board board, ShipBase ship)
     {
         board.Remove(ship);
