@@ -6,4 +6,4 @@ public enum ShotResult { Invalid, AlreadyTried, Miss, Hit, Sunk }
 public enum Phase { Preparation, Playing, Finished }
 public enum PlayerKind { Human, AI }
 public enum DrawState { None, ProposedByP1, ProposedByP2, Accepted }
-public enum ShootingMode { Single, Salvo2, Salvo3x3 }
+public enum ShootingMode { Single, Salvo3x3 }

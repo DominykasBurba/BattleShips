@@ -324,7 +324,6 @@
             <span class="settings-label">Shoot Mode:</span>
             <select class="custom-select" @bind="_shootingMode">
                 <option value="@ShootingMode.Single">Normal (1 per turn)</option>
-                <option value="@ShootingMode.Salvo2">Salvo (2 per turn)</option>
                 <option value="@ShootingMode.Salvo3x3">3x3 Area Shot</option>
             </select>
         </div>
@@ -691,7 +690,7 @@ else if (_opponent == OpponentKind.Human && _gameId != null)
             }
             else
             {
-                // Fire single shot (Salvo2 will be handled by allowing multiple single shots)
+                // Fire single shot
                 await _hubConnection.InvokeAsync("FireShot", _gameId, pos);
             }
         }

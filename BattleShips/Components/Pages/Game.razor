@@ -321,11 +321,7 @@ else if (GameService.Session.Phase == Phase.Playing)
                 }
 
                 GameService.SetShootingMode(mode);
-
-                if (mode == ShootingMode.Salvo2)
-                    GameService.SetShotsPerTurn(2);
-                else
-                    GameService.SetShotsPerTurn(1);
+                GameService.SetShotsPerTurn(1);
 
                 // Randomize both fleets to get started
                 GameService.RandomizeFor(GameService.Session.P1);
@@ -353,11 +349,7 @@ else if (GameService.Session.Phase == Phase.Playing)
         if (Enum.TryParse<ShootingMode>(e.Value?.ToString(), out var mode))
         {
             GameService.SetShootingMode(mode);
-
-            if (mode == ShootingMode.Salvo2)
-                GameService.SetShotsPerTurn(2);
-            else
-                GameService.SetShotsPerTurn(1);
+            GameService.SetShotsPerTurn(1);
         }
     }
 

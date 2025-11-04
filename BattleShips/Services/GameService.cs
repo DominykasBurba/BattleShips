@@ -1,4 +1,5 @@
 using BattleShips.Domain;
+using BattleShips.Domain.AttackStrategies;
 
 namespace BattleShips.Services;
 
@@ -13,10 +14,27 @@ public class GameService
     // Shooting mode configuration
     public ShootingMode ShootingMode { get; set; } = ShootingMode.Single;
 
+    // Attack strategy (Strategy pattern)
+    private IAttackStrategy _attackStrategy;
+
     // still supported for "salvo" style; ignored when KeepTurnOnHit = true
     private int _shotsUsedThisTurn = 0;
 
-    public GameService(PlacementService placement) => _placement = placement;
+    public GameService(PlacementService placement)
+    {
+        _placement = placement;
+        _attackStrategy = GetStrategyForMode(ShootingMode);
+    }
+
+    private IAttackStrategy GetStrategyForMode(ShootingMode mode)
+    {
+        return mode switch
+        {
+            ShootingMode.Salvo3x3 => new Salvo3x3Strategy(),
+            ShootingMode.Single => new SingleShotStrategy(),
+            _ => new SingleShotStrategy()
+        };
+    }
 
     public void NewLocalSession(int size = 10, bool enemyIsAi = true)
     {
@@ -53,6 +71,7 @@ public class GameService
     public void SetShootingMode(ShootingMode mode)
     {
         ShootingMode = mode;
+        _attackStrategy = GetStrategyForMode(mode);
         _shotsUsedThisTurn = 0;
     }
 
@@ -68,14 +87,14 @@ public class GameService
     {
         if (Session is null || Session.Phase != Phase.Playing) return ShotResult.Invalid;
 
-        // Your shot vs CURRENT opponent
-        var result = Session.Fire(pos);
-        if (Session.Phase == Phase.Finished) return result;
+        // Use strategy pattern to execute attack
+        var attackResult = _attackStrategy.ExecuteAttack(Session, pos);
+        
+        if (Session.Phase == Phase.Finished) 
+            return attackResult.SingleResult ?? ShotResult.Invalid;
 
-        // CLASSIC RULE: keep turn on hit/sunk, lose turn on miss/invalid/already tried
-        bool endTurn = result is ShotResult.Miss or ShotResult.Invalid or ShotResult.AlreadyTried;
-
-        if (endTurn)
+        // Handle turn ending based on strategy result
+        if (attackResult.ShouldEndTurn)
         {
             // Hand turn to opponent (possibly AI)
             Session.EndTurn();
@@ -87,7 +106,7 @@ public class GameService
             }
         }
 
-        return result;
+        return attackResult.SingleResult ?? ShotResult.Invalid;
     }
 
     public List<ShotResult> Fire3x3Salvo(Position centerPos)
@@ -95,33 +114,11 @@ public class GameService
         if (Session is null || Session.Phase != Phase.Playing) 
             return new List<ShotResult> { ShotResult.Invalid };
 
-        var results = new List<ShotResult>();
-        var boardSize = Session.Opponent.Board.Size;
-        
-        // Fire at 3x3 grid centered on the clicked position
-        for (int dr = -1; dr <= 1; dr++)
-        {
-            for (int dc = -1; dc <= 1; dc++)
-            {
-                var targetRow = centerPos.Row + dr;
-                var targetCol = centerPos.Col + dc;
-                
-                // Skip if out of bounds
-                if (targetRow < 0 || targetRow >= boardSize || targetCol < 0 || targetCol >= boardSize)
-                    continue;
-                
-                var targetPos = new Position(targetRow, targetCol);
-                var result = Session.Fire(targetPos);
-                results.Add(result);
-                
-                if (Session.Phase == Phase.Finished) break;
-            }
-            if (Session.Phase == Phase.Finished) break;
-        }
+        // Use Salvo3x3Strategy for 3x3 attacks
+        var salvoStrategy = new Salvo3x3Strategy();
+        var attackResult = salvoStrategy.ExecuteAttack(Session, centerPos);
 
-        // Note: Turn ending is handled by the caller (HandleAiTurn or OnFireAtEnemy)
-
-        return results;
+        return attackResult.Results;
     }
 
     public void HandleAiTurn()
@@ -131,27 +128,15 @@ public class GameService
 
         while (Session.Phase == Phase.Playing && Session.Current.Kind == PlayerKind.AI)
         {
-            if (ShootingMode == ShootingMode.Salvo3x3)
-            {
-                // AI uses 3x3 salvo
-                var centerTarget = Session.Current.ChooseTarget(Session.P1.Board, new HashSet<Position>());
-                var aiResults = Fire3x3Salvo(centerTarget);
-                if (Session.Phase == Phase.Finished) break;
-                
-                // AI loses turn after 3x3 salvo (regardless of hits/misses)
-                break;
-            }
-            else
-            {
-                // AI uses single shot
-                var target = Session.Current.ChooseTarget(Session.P1.Board, new HashSet<Position>());
-                var aiResult = Session.Fire(target);
-                if (Session.Phase == Phase.Finished) break;
+            // Use the current attack strategy
+            var target = Session.Current.ChooseTarget(Session.P1.Board, new HashSet<Position>());
+            var attackResult = _attackStrategy.ExecuteAttack(Session, target);
+            
+            if (Session.Phase == Phase.Finished) break;
 
-                // AI loses turn on miss/invalid/duplicate
-                if (aiResult is ShotResult.Miss or ShotResult.Invalid or ShotResult.AlreadyTried)
-                    break;
-            }
+            // End AI turn based on strategy result
+            if (attackResult.ShouldEndTurn)
+                break;
         }
 
         // Hand back to you if game still going

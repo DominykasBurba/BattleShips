@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using BattleShips.Domain;
+using BattleShips.Domain.AttackStrategies;
 using BattleShips.Hubs;
 
 namespace BattleShips.Services;
@@ -103,7 +104,10 @@ public class GameLobbyService(PlacementService placementService)
         var cell = targetBoard[position];
         var ship = cell.Ship;
 
-        var result = session.GameSession.Fire(position);
+        // Use strategy pattern to execute attack
+        var strategy = GetStrategyForMode(session.ShootingMode);
+        var attackResult = strategy.ExecuteAttack(session.GameSession, position);
+        var result = attackResult.SingleResult ?? ShotResult.Invalid;
 
         // If ship was sunk, get all its positions
         List<Position>? sunkShipPositions = null;
@@ -112,33 +116,12 @@ public class GameLobbyService(PlacementService placementService)
             sunkShipPositions = ship.Cells().ToList();
         }
 
-        // Increment shot counter
-        session.ShotsUsedThisTurn++;
-
-        // Determine if turn should end
-        bool endTurn = false;
-
-        if (session.ShootingMode == ShootingMode.Salvo2)
-        {
-            // For Salvo2, end turn after 2 shots OR on miss/invalid
-            if (session.ShotsUsedThisTurn >= 2 || result is ShotResult.Miss or ShotResult.Invalid or ShotResult.AlreadyTried)
-            {
-                endTurn = true;
-            }
-        }
-        else
-        {
-            // For single shot mode, end turn on miss/invalid
-            if (result is ShotResult.Miss or ShotResult.Invalid or ShotResult.AlreadyTried)
-            {
-                endTurn = true;
-            }
-        }
+        // Determine if turn should end based on strategy result
+        bool endTurn = attackResult.ShouldEndTurn;
 
         if (endTurn)
         {
             session.GameSession.EndTurn();
-            session.ShotsUsedThisTurn = 0;
         }
 
         var winner = session.GameSession.Winner?.Name;
@@ -157,47 +140,35 @@ public class GameLobbyService(PlacementService placementService)
         if (player == null || session.GameSession.Current != player)
             return null;
 
-        var results = new List<ShotResult>();
-        var positions = new List<Position>();
+        // Use Salvo3x3Strategy for 3x3 attacks
+        var strategy = new Salvo3x3Strategy();
+        var attackResult = strategy.ExecuteAttack(session.GameSession, centerPosition);
+
+        // Get sunk ships information
         var sunkShipsSet = new HashSet<ShipBase>();
-        var boardSize = session.GameSession.Opponent.Board.Size;
         var targetBoard = session.GameSession.Opponent.Board;
-
-        // Fire at 3x3 grid
-        for (int dr = -1; dr <= 1; dr++)
+        
+        for (int i = 0; i < attackResult.Positions.Count; i++)
         {
-            for (int dc = -1; dc <= 1; dc++)
+            var pos = attackResult.Positions[i];
+            var result = attackResult.Results[i];
+            
+            if (result == ShotResult.Sunk)
             {
-                var targetRow = centerPosition.Row + dr;
-                var targetCol = centerPosition.Col + dc;
-
-                if (targetRow < 0 || targetRow >= boardSize || targetCol < 0 || targetCol >= boardSize)
-                    continue;
-
-                var targetPos = new Position(targetRow, targetCol);
-                var cell = targetBoard[targetPos];
+                var cell = targetBoard[pos];
                 var ship = cell.Ship;
-
-                var result = session.GameSession.Fire(targetPos);
-                results.Add(result);
-                positions.Add(targetPos);
-
-                // Track sunk ships (only add each ship once)
-                if (result == ShotResult.Sunk && ship != null)
+                if (ship != null)
                 {
                     sunkShipsSet.Add(ship);
                 }
-
-                if (session.GameSession.Phase == Phase.Finished) break;
             }
-            if (session.GameSession.Phase == Phase.Finished) break;
         }
 
         // Convert sunk ships to list of position lists
         var sunkShips = sunkShipsSet.Select(ship => ship.Cells().ToList()).ToList();
 
-        // End turn after salvo
-        if (session.GameSession.Phase == Phase.Playing)
+        // End turn after salvo (strategy indicates this)
+        if (attackResult.ShouldEndTurn && session.GameSession.Phase == Phase.Playing)
         {
             session.GameSession.EndTurn();
         }
@@ -205,7 +176,7 @@ public class GameLobbyService(PlacementService placementService)
         var winner = session.GameSession.Winner?.Name;
         var nextPlayer = session.GetConnectionId(session.GameSession.Current);
 
-        return (results, positions, session.GameSession.Phase, winner, nextPlayer, sunkShips);
+        return (attackResult.Results, attackResult.Positions, session.GameSession.Phase, winner, nextPlayer, sunkShips);
     }
 
     public void Surrender(string gameId, string connectionId)
@@ -270,6 +241,16 @@ public class GameLobbyService(PlacementService placementService)
     {
         return Guid.NewGuid().ToString("N")[..8].ToUpper();
     }
+
+    private IAttackStrategy GetStrategyForMode(ShootingMode mode)
+    {
+        return mode switch
+        {
+            ShootingMode.Salvo3x3 => new Salvo3x3Strategy(),
+            ShootingMode.Single => new SingleShotStrategy(),
+            _ => new SingleShotStrategy()
+        };
+    }
 }
 
 public class OnlineGameSession
@@ -292,12 +273,6 @@ public class OnlineGameSession
         var p1 = new HumanPlayer("Player 1", boardSize);
         var p2 = new HumanPlayer("Player 2", boardSize);
         GameSession = new GameSession(p1, p2);
-
-        // Set shots per turn based on shooting mode
-        if (shootingMode == ShootingMode.Salvo2)
-        {
-            GameSession.SetShotsPerTurn(2);
-        }
     }
 
     public Player? GetPlayer(string connectionId)
