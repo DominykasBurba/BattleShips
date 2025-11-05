@@ -1,4 +1,5 @@
 using BattleShips.Domain.Ships;
+using BattleShips.Domain.Cells;
 
 namespace BattleShips.Domain;
 
@@ -7,16 +8,20 @@ public class Board
     public int Size { get; }
     private readonly Cell[,] _cells;
     private readonly List<ShipBase> _ships = new();
+    private readonly CellFactory _cellFactory;
 
     public IReadOnlyList<ShipBase> Ships => _ships;
 
-    public Board(int size = 10)
+    public Board(int size = 10, CellFactory? cellFactory = null)
     {
         Size = size;
+        _cellFactory = cellFactory ?? new StandardCellFactory();
         _cells = new Cell[size, size];
+        
+        // Use Factory Method pattern to create cells
         for (int r = 0; r < size; r++)
             for (int c = 0; c < size; c++)
-                _cells[r,c] = new Cell(r,c);
+                _cells[r,c] = _cellFactory.CreateCell(r, c);
     }
 
     public Cell this[int r, int c] => _cells[r,c];

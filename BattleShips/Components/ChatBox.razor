@@ -1,4 +1,5 @@
 @using BattleShips.Services
+@using BattleShips.Domain.Commands
 @inject ChatService Chat
 @implements IDisposable
 
@@ -20,14 +21,25 @@
 
 @code {
     private string text = string.Empty;
+    private readonly ChatInvoker _invoker = new();
 
     protected override void OnInitialized() => Chat.Updated += StateHasChanged;
     public void Dispose() => Chat.Updated -= StateHasChanged;
 
+    /// <summary>
+    /// Client method: Creates a command and passes it to the invoker.
+    /// This demonstrates the Command Pattern where Client -> Invoker -> Command -> Receiver.
+    /// </summary>
     private void Send()
     {
         if (string.IsNullOrWhiteSpace(text)) return;
-        Chat.Send("Player 1", text);
+        
+        // Client creates the command
+        var command = new SendMessageCommand(Chat, "Player 1", text);
+        
+        // Client passes command to invoker
+        _invoker.RunCommand(command);
+        
         text = string.Empty;
     }
 }
