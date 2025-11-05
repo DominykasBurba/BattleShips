@@ -42,6 +42,14 @@ public class GameService
         Player p2 = enemyIsAi ? new AiPlayer("Enemy AI", size) : new HumanPlayer("Player 2", size);
         Session = new GameSession(p1, p2);
         _shotsUsedThisTurn = 0;
+        
+        // Attach observers to the session (Observer pattern)
+        if (Session != null)
+        {
+            _ = new Domain.Observer.GameStateObserver(Session);
+            _ = new Domain.Observer.TurnChangeObserver(Session);
+            _ = new Domain.Observer.GameEndObserver(Session);
+        }
     }
 
     public void ResetShips()

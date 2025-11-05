@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using BattleShips.Domain;
 using BattleShips.Domain.AttackStrategies;
 using BattleShips.Domain.BoardBuilder;
+using BattleShips.Domain.Observer;
 using BattleShips.Hubs;
 
 namespace BattleShips.Services;
@@ -274,6 +275,11 @@ public class OnlineGameSession
         var p1 = new HumanPlayer("Player 1", boardSize);
         var p2 = new HumanPlayer("Player 2", boardSize);
         GameSession = new GameSession(p1, p2);
+        
+        // Attach observers to the session (Observer pattern)
+        _ = new GameStateObserver(GameSession);
+        _ = new TurnChangeObserver(GameSession);
+        _ = new GameEndObserver(GameSession);
     }
 
     public Player? GetPlayer(string connectionId)
