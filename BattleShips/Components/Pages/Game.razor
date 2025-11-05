@@ -303,13 +303,25 @@ else if (GameService.Session.Phase == Phase.Playing)
     [SupplyParameterFromQuery(Name = "mode")]
     public string? ShootingModeParam { get; set; }
 
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "shipType")]
+    public string? ShipTypeParam { get; set; }
+
     protected override void OnInitialized()
     {
         // If no session exists, create one from query parameter
         if (GameService.Session == null)
         {
             int size = BoardSize ?? 10; // Default to 10 if no parameter
-            GameService.NewLocalSession(size, enemyIsAi: true);
+
+            // Parse ship type from query parameter
+            ShipType shipType = ShipType.Classic;
+            if (!string.IsNullOrEmpty(ShipTypeParam) && Enum.TryParse<ShipType>(ShipTypeParam, out var parsedShipType))
+            {
+                shipType = parsedShipType;
+            }
+
+            GameService.NewLocalSession(size, enemyIsAi: true, shipType: shipType);
 
             if (GameService.Session != null)
             {

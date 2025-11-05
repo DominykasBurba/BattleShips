@@ -22,22 +22,22 @@ public class GameHub(GameLobbyService lobby) : Hub
         await base.OnDisconnectedAsync(exception);
     }
 
-    public async Task<string> CreateGame(int boardSize, ShootingMode shootingMode)
+    public async Task<string> CreateGame(int boardSize, ShootingMode shootingMode, ShipType shipType)
     {
-        var gameId = lobby.CreateGame(Context.ConnectionId, boardSize, shootingMode);
+        var gameId = lobby.CreateGame(Context.ConnectionId, boardSize, shootingMode, shipType);
         await Groups.AddToGroupAsync(Context.ConnectionId, gameId);
         return gameId;
     }
 
     public async Task<JoinGameResult?> JoinGame(string gameId)
     {
-        var (success, boardSize, shootingMode) = lobby.JoinGame(gameId, Context.ConnectionId);
+        var (success, boardSize, shootingMode, shipType) = lobby.JoinGame(gameId, Context.ConnectionId);
         if (!success) return null;
 
         await Groups.AddToGroupAsync(Context.ConnectionId, gameId);
 
         await Clients.OthersInGroup(gameId).SendAsync("OpponentJoined");
-        return new JoinGameResult(success, boardSize, shootingMode);
+        return new JoinGameResult(success, boardSize, shootingMode, shipType);
     }
 
     public async Task PlaceShips(string gameId, List<ShipPlacement> ships)
@@ -134,4 +134,4 @@ public class GameHub(GameLobbyService lobby) : Hub
 }
 
 public record ShipPlacement(ShipKind Kind, Position Start, bool IsHorizontal);
-public record JoinGameResult(bool Success, int BoardSize, ShootingMode ShootingMode);
+public record JoinGameResult(bool Success, int BoardSize, ShootingMode ShootingMode, ShipType ShipType);

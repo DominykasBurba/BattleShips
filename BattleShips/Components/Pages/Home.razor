@@ -327,6 +327,13 @@
                 <option value="@ShootingMode.Salvo3x3">3x3 Area Shot</option>
             </select>
         </div>
+        <div class="settings-row">
+            <span class="settings-label">Ship Type:</span>
+            <select class="custom-select" @bind="_shipType">
+                <option value="@ShipType.Classic">Classic (Smaller ships)</option>
+                <option value="@ShipType.Modern">Modern (Larger ships)</option>
+            </select>
+        </div>
         <div style="text-align: center; margin-top: 2rem;">
             <button class="btn btn-modern btn-primary-modern" @onclick="CreateGame">
                 @(_opponent == OpponentKind.Bot ? "Start Game" : "Create Online Game")
@@ -530,6 +537,7 @@ else if (_opponent == OpponentKind.Human && _gameId != null)
     private string? _errorMessage;
     private string _lastShot = "—";
     private ShootingMode _shootingMode = ShootingMode.Single;
+    private ShipType _shipType = ShipType.Classic;
     private readonly PlacementService _placementService = new();
 
     protected override async Task OnInitializedAsync()
@@ -560,8 +568,8 @@ else if (_opponent == OpponentKind.Human && _gameId != null)
 
         if (_opponent == OpponentKind.Bot)
         {
-            // Navigate to game page with board size and shooting mode parameters
-            Nav.NavigateTo($"/game?size={_size}&mode={_shootingMode}");
+            // Navigate to game page with board size, shooting mode, and ship type parameters
+            Nav.NavigateTo($"/game?size={_size}&mode={_shootingMode}&shipType={_shipType}");
         }
         else
         {
@@ -570,7 +578,7 @@ else if (_opponent == OpponentKind.Human && _gameId != null)
 
             try
             {
-                _gameId = await _hubConnection.InvokeAsync<string>("CreateGame", _size, _shootingMode);
+                _gameId = await _hubConnection.InvokeAsync<string>("CreateGame", _size, _shootingMode, _shipType);
                 _myBoard = new Board(_size);
                 _opponentBoard = new Board(_size);
                 _onlinePhase = Phase.Preparation;
@@ -599,6 +607,7 @@ else if (_opponent == OpponentKind.Human && _gameId != null)
                 _opponent = OpponentKind.Human;
                 _size = result.BoardSize; // Use board size from the game
                 _shootingMode = result.ShootingMode; // Use shooting mode from the game
+                _shipType = result.ShipType; // Use ship type from the game
                 _myBoard = new Board(result.BoardSize);
                 _opponentBoard = new Board(result.BoardSize);
                 _opponentJoined = true;
@@ -618,7 +627,7 @@ else if (_opponent == OpponentKind.Human && _gameId != null)
     }
 
     // Data transfer object for JoinGame result
-    private record JoinGameResult(bool Success, int BoardSize, ShootingMode ShootingMode);
+    private record JoinGameResult(bool Success, int BoardSize, ShootingMode ShootingMode, ShipType ShipType);
 
     private void OnShipPlaced(ShipKind shipKind)
     {
@@ -635,6 +644,8 @@ else if (_opponent == OpponentKind.Human && _gameId != null)
     // Online multiplayer methods
     private void RandomizeOnlineFleet()
     {
+        // Set the ship type before randomizing
+        _placementService.SetShipType(_shipType);
         _placementService.RandomizeFleet(_myBoard);
         StateHasChanged();
     }
@@ -648,9 +659,20 @@ else if (_opponent == OpponentKind.Human && _gameId != null)
 
     private bool CanMarkReady()
     {
-        var expected = new[] { 4, 3, 3, 2, 2, 2, 1, 1, 1, 1 }.OrderBy(x => x).ToArray();
-        var actual = _myBoard.Ships.Select(s => s.Length).OrderBy(x => x).ToArray();
-        return expected.SequenceEqual(actual);
+        // Check ship composition by Kind (not length) to support both Classic and Modern
+        var expectedComposition = DefaultFleet.Composition
+            .GroupBy(k => k)
+            .OrderBy(g => g.Key)
+            .Select(g => (Kind: g.Key, Count: g.Count()))
+            .ToArray();
+
+        var actualComposition = _myBoard.Ships
+            .GroupBy(s => s.Kind)
+            .OrderBy(g => g.Key)
+            .Select(g => (Kind: g.Key, Count: g.Count()))
+            .ToArray();
+
+        return expectedComposition.SequenceEqual(actualComposition);
     }
 
     private async Task MarkReady()

@@ -3,6 +3,7 @@ using BattleShips.Domain;
 using BattleShips.Domain.AttackStrategies;
 using BattleShips.Domain.BoardBuilder;
 using BattleShips.Domain.Observer;
+using BattleShips.Domain.Ships.Factories;
 using BattleShips.Hubs;
 
 namespace BattleShips.Services;
@@ -13,26 +14,26 @@ public class GameLobbyService(PlacementService placementService)
     private readonly ConcurrentDictionary<string, string> _connectionToGame = new();
     private readonly PlacementService _placementService = placementService;
 
-    public string CreateGame(string connectionId, int boardSize, ShootingMode shootingMode = ShootingMode.Single)
+    public string CreateGame(string connectionId, int boardSize, ShootingMode shootingMode = ShootingMode.Single, ShipType shipType = ShipType.Classic)
     {
         var gameId = GenerateGameId();
-        var session = new OnlineGameSession(gameId, connectionId, boardSize, shootingMode);
+        var session = new OnlineGameSession(gameId, connectionId, boardSize, shootingMode, shipType);
         _games[gameId] = session;
         _connectionToGame[connectionId] = gameId;
         return gameId;
     }
 
-    public (bool Success, int BoardSize, ShootingMode ShootingMode) JoinGame(string gameId, string connectionId)
+    public (bool Success, int BoardSize, ShootingMode ShootingMode, ShipType ShipType) JoinGame(string gameId, string connectionId)
     {
         if (!_games.TryGetValue(gameId, out var session))
-            return (false, 0, ShootingMode.Single);
+            return (false, 0, ShootingMode.Single, ShipType.Classic);
 
         if (session.Player2ConnectionId != null)
-            return (false, 0, ShootingMode.Single); // Game is full
+            return (false, 0, ShootingMode.Single, ShipType.Classic); // Game is full
 
         session.Player2ConnectionId = connectionId;
         _connectionToGame[connectionId] = gameId;
-        return (true, session.GameSession.P1.Board.Size, session.ShootingMode);
+        return (true, session.GameSession.P1.Board.Size, session.ShootingMode, session.ShipType);
     }
 
     public bool PlaceShips(string gameId, string connectionId, List<ShipPlacement> ships)
@@ -44,9 +45,16 @@ public class GameLobbyService(PlacementService placementService)
         if (player == null)
             return false;
 
+        // Create the appropriate factory based on ship type
+        IShipFactory factory = session.ShipType switch
+        {
+            ShipType.Modern => new ModernShipFactory(),
+            _ => new ClassicShipFactory()
+        };
+
         // Use Builder pattern: ManualFleetBuilder for manual ship placement
-        var builder = new ManualFleetBuilder(player.Board);
-        
+        var builder = new ManualFleetBuilder(player.Board, factory);
+
         // Place each ship using the builder
         foreach (var placement in ships)
         {
@@ -264,18 +272,20 @@ public class OnlineGameSession
     public bool Player1Ready { get; set; }
     public bool Player2Ready { get; set; }
     public ShootingMode ShootingMode { get; set; }
+    public ShipType ShipType { get; set; }
     public int ShotsUsedThisTurn { get; set; }
 
-    public OnlineGameSession(string gameId, string player1ConnectionId, int boardSize, ShootingMode shootingMode = ShootingMode.Single)
+    public OnlineGameSession(string gameId, string player1ConnectionId, int boardSize, ShootingMode shootingMode = ShootingMode.Single, ShipType shipType = ShipType.Classic)
     {
         GameId = gameId;
         Player1ConnectionId = player1ConnectionId;
         ShootingMode = shootingMode;
+        ShipType = shipType;
         ShotsUsedThisTurn = 0;
         var p1 = new HumanPlayer("Player 1", boardSize);
         var p2 = new HumanPlayer("Player 2", boardSize);
         GameSession = new GameSession(p1, p2);
-        
+
         // Attach observers to the session (Observer pattern)
         _ = new GameStateObserver(GameSession);
         _ = new TurnChangeObserver(GameSession);

@@ -1,6 +1,7 @@
 namespace BattleShips.Domain.Ships;
 
 using BattleShips.Domain;
+using BattleShips.Domain.Ships.Modern;
 
 public abstract class ShipBase
 {
@@ -37,9 +38,13 @@ public abstract class ShipBase
     public ShipKind Kind => this switch
     {
         Battleship => ShipKind.Battleship,
+        ModernBattleship => ShipKind.Battleship,
         Submarine => ShipKind.Submarine,
+        ModernSubmarine => ShipKind.Submarine,
         Destroyer => ShipKind.Destroyer,
+        ModernDestroyer => ShipKind.Destroyer,
         Cruiser => ShipKind.Cruiser,
+        ModernCruiser => ShipKind.Cruiser,
         _ => throw new InvalidOperationException("Unknown ship type")
     };
 }

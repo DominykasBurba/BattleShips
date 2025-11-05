@@ -67,12 +67,12 @@ Loops through DefaultFleet.Composition
 For each ship: randomly place it on board
 ```
 
-**Ship Construction**: `PlacementService.RandomizeFleet()` lines 10-29
+**Ship Construction**: Uses Builder pattern with `RandomFleetBuilder`
 - Clears board
 - For each ship type in `DefaultFleet.Composition`:
   - Randomly picks orientation (Horizontal/Vertical)
   - Randomly picks position
-  - Creates ship via `ShipFactory.Create()`
+  - Creates ship via `IShipFactory.CreateShip()` (Abstract Factory pattern)
   - Places on board via `board.Place(ship)`
 
 #### B) **Online Game (vs Human)**
@@ -93,14 +93,14 @@ Player manually places ships via UI
 GameLobbyService.PlaceShips(gameId, connectionId, ships)
     ↓
 For each ship placement:
-    - Creates ship via ShipFactory.Create()
+    - Creates ship via ManualFleetBuilder with IShipFactory
     - Places on board via board.Place(ship)
 ```
 
-**Ship Construction**: `GameLobbyService.PlaceShips()` lines 36-63
+**Ship Construction**: Uses Builder pattern with `ManualFleetBuilder`
 - Clears board
 - For each ship in the provided list:
-  - Creates ship via `ShipFactory.Create(kind, position, orientation)`
+  - Creates ship via `IShipFactory.CreateShip(kind, position, orientation)` (Abstract Factory pattern)
   - Places on board via `board.Place(ship)`
 
 ---
@@ -184,9 +184,10 @@ The Builder pattern should centralize **ship placement logic**:
 
 1. **`Domain/Player.cs`** - Creates Board when Player is created
 2. **`Domain/Board.cs`** - The Board class (empty grid initially)
-3. **`Services/PlacementService.cs`** - Random ship placement
-4. **`Services/GameLobbyService.cs`** - Manual ship placement for online
+3. **`Services/PlacementService.cs`** - Random ship placement using Builder pattern
+4. **`Services/GameLobbyService.cs`** - Manual ship placement for online using Builder pattern
 5. **`Services/GameService.cs`** - Orchestrates local games
-6. **`Domain/Ships/ShipFactory.cs`** - Creates ship objects
-7. **`Domain/Ships/ShipKind.cs`** - Defines fleet composition
+6. **`Domain/Ships/Factories/IShipFactory.cs`** - Abstract Factory pattern for creating ship objects
+7. **`Domain/BoardBuilder/`** - Builder pattern implementations (RandomFleetBuilder, ManualFleetBuilder)
+8. **`Domain/Ships/ShipKind.cs`** - Defines fleet composition
 

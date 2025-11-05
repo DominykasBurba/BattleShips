@@ -36,13 +36,13 @@ public class GameService
         };
     }
 
-    public void NewLocalSession(int size = 10, bool enemyIsAi = true)
+    public void NewLocalSession(int size = 10, bool enemyIsAi = true, ShipType shipType = ShipType.Classic)
     {
         var p1 = new HumanPlayer("Player 1", size);
         Player p2 = enemyIsAi ? new AiPlayer("Enemy AI", size) : new HumanPlayer("Player 2", size);
         Session = new GameSession(p1, p2);
         _shotsUsedThisTurn = 0;
-        
+
         // Attach observers to the session (Observer pattern)
         if (Session != null)
         {
@@ -50,6 +50,9 @@ public class GameService
             _ = new Domain.Observer.TurnChangeObserver(Session);
             _ = new Domain.Observer.GameEndObserver(Session);
         }
+
+        // Store ship type for use in RandomizeFor
+        _placement.SetShipType(shipType);
     }
 
     public void ResetShips()

@@ -53,15 +53,19 @@
     private List<ShipTypeInfo> GetAvailableShips()
     {
         var shipTypes = new List<ShipTypeInfo>();
-        
+
         // Get the default fleet composition
         var fleetComposition = DefaultFleet.Composition.GroupBy(k => k)
                                                       .ToDictionary(g => g.Key, g => g.Count());
-        
+
         // Count how many of each type are already placed
-        var placedShips = Board.Ships.GroupBy(s => GetShipKind(s))
+        var placedShips = Board.Ships.GroupBy(s => s.Kind)
                                    .ToDictionary(g => g.Key, g => g.Count());
-        
+
+        // Get actual ship lengths from the board (to support both Classic and Modern)
+        var shipLengths = Board.Ships.GroupBy(s => s.Kind)
+                                   .ToDictionary(g => g.Key, g => g.First().Length);
+
         // Calculate remaining ships
         foreach (var kvp in fleetComposition)
         {
@@ -69,29 +73,20 @@
             var totalCount = kvp.Value;
             var placedCount = placedShips.GetValueOrDefault(shipKind, 0);
             var remainingCount = totalCount - placedCount;
-            
+
+            // Try to get length from placed ships, otherwise use default based on kind
+            int length = shipLengths.GetValueOrDefault(shipKind, GetDefaultShipLength(shipKind));
+
             shipTypes.Add(new ShipTypeInfo
             {
                 Kind = shipKind,
                 Name = GetShipName(shipKind),
-                Length = GetShipLength(shipKind),
+                Length = length,
                 Count = remainingCount
             });
         }
-        
-        return shipTypes.OrderByDescending(s => s.Length).ToList();
-    }
 
-    private ShipKind GetShipKind(ShipBase ship)
-    {
-        return ship switch
-        {
-            Battleship => ShipKind.Battleship,
-            Submarine => ShipKind.Submarine,
-            Destroyer => ShipKind.Destroyer,
-            Cruiser => ShipKind.Cruiser,
-            _ => throw new ArgumentException("Unknown ship type")
-        };
+        return shipTypes.OrderByDescending(s => s.Length).ToList();
     }
 
     private string GetShipName(ShipKind kind)
@@ -106,8 +101,9 @@
         };
     }
 
-    private int GetShipLength(ShipKind kind)
+    private int GetDefaultShipLength(ShipKind kind)
     {
+        // Default to classic ship lengths if no ships are placed yet
         return kind switch
         {
             ShipKind.Battleship => 4,

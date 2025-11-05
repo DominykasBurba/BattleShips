@@ -1,4 +1,5 @@
 using BattleShips.Domain.Ships;
+using BattleShips.Domain.Ships.Factories;
 
 namespace BattleShips.Domain.BoardBuilder;
 
@@ -9,6 +10,7 @@ namespace BattleShips.Domain.BoardBuilder;
 public class ManualFleetBuilder : IBoardBuilder
 {
     private readonly Board _board;
+    private readonly IShipFactory _shipFactory;
     private Position? _pendingPosition;
     private Orientation? _pendingOrientation;
 
@@ -16,10 +18,12 @@ public class ManualFleetBuilder : IBoardBuilder
     /// Creates a new ManualFleetBuilder that will work with an existing board.
     /// </summary>
     /// <param name="board">The board to place ships on</param>
-    public ManualFleetBuilder(Board board)
+    /// <param name="shipFactory">The factory to use for creating ships (defaults to ClassicShipFactory if not provided)</param>
+    public ManualFleetBuilder(Board board, IShipFactory? shipFactory = null)
     {
         _board = board;
         _board.Clear(); // Clear existing ships before building
+        _shipFactory = shipFactory ?? new ClassicShipFactory();
     }
 
     /// <summary>
@@ -49,8 +53,8 @@ public class ManualFleetBuilder : IBoardBuilder
     /// </summary>
     public void BuildPart(ShipKind shipKind, Position position, Orientation orientation)
     {
-        var ship = ShipFactory.Create(shipKind, position, orientation);
-        
+        var ship = _shipFactory.CreateShip(shipKind, position, orientation);
+
         if (!_board.Place(ship))
             throw new InvalidOperationException($"Failed to place {shipKind} at position {position} with orientation {orientation}.");
     }
@@ -61,7 +65,7 @@ public class ManualFleetBuilder : IBoardBuilder
     /// </summary>
     public bool TryBuildPart(ShipKind shipKind, Position position, Orientation orientation)
     {
-        var ship = ShipFactory.Create(shipKind, position, orientation);
+        var ship = _shipFactory.CreateShip(shipKind, position, orientation);
         return _board.Place(ship);
     }
 

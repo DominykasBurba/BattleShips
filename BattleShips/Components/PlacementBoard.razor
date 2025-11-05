@@ -1,5 +1,6 @@
 @using BattleShips.Domain
 @using BattleShips.Domain.Ships
+@using BattleShips.Domain.Ships.Factories
 
 <div class="board-frame">
     <div class="board-with-labels">
@@ -44,8 +45,10 @@
     [Parameter] public Board Board { get; set; } = default!;
     [Parameter] public EventCallback<ShipKind> OnShipPlaced { get; set; }
     [Parameter] public ShipKind? SelectedShip { get; set; }
-    
+    [Parameter] public IShipFactory? ShipFactory { get; set; }
+
     private ShipBase? _last;
+    private IShipFactory _factory => ShipFactory ?? new ClassicShipFactory();
 
     private async Task Click(int r, int c)
     {
@@ -97,7 +100,7 @@
         if (SelectedShip is null) return;
 
         // Try horizontal first
-        var ship = ShipFactory.Create(SelectedShip.Value, position, Orientation.Horizontal);
+        var ship = _factory.CreateShip(SelectedShip.Value, position, Orientation.Horizontal);
         if (Board.Place(ship))
         {
             await OnShipPlaced.InvokeAsync(SelectedShip.Value);
@@ -106,7 +109,7 @@
         }
 
         // Try vertical
-        ship = ShipFactory.Create(SelectedShip.Value, position, Orientation.Vertical);
+        ship = _factory.CreateShip(SelectedShip.Value, position, Orientation.Vertical);
         if (Board.Place(ship))
         {
             await OnShipPlaced.InvokeAsync(SelectedShip.Value);
@@ -147,24 +150,11 @@
     {
         // Remove the ship from the board
         Board.Remove(ship);
-        
-        // Notify parent component to update ship inventory
-        var shipKind = GetShipKind(ship);
-        await OnShipPlaced.InvokeAsync(shipKind); // This will trigger inventory update
-        
-        StateHasChanged();
-    }
 
-    private ShipKind GetShipKind(ShipBase ship)
-    {
-        return ship switch
-        {
-            Battleship => ShipKind.Battleship,
-            Submarine => ShipKind.Submarine,
-            Destroyer => ShipKind.Destroyer,
-            Cruiser => ShipKind.Cruiser,
-            _ => throw new ArgumentException("Unknown ship type")
-        };
+        // Notify parent component to update ship inventory
+        await OnShipPlaced.InvokeAsync(ship.Kind); // This will trigger inventory update
+
+        StateHasChanged();
     }
 
 }

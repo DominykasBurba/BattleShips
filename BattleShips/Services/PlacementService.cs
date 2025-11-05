@@ -1,21 +1,39 @@
 using BattleShips.Domain;
 using BattleShips.Domain.BoardBuilder;
 using BattleShips.Domain.Ships;
+using BattleShips.Domain.Ships.Factories;
 
 namespace BattleShips.Services;
 
 public class PlacementService
 {
     private readonly FleetDirector _director = new();
+    private ShipType _shipType = ShipType.Classic;
+
+    /// <summary>
+    /// Sets the ship type to use for future fleet randomizations.
+    /// </summary>
+    public void SetShipType(ShipType shipType)
+    {
+        _shipType = shipType;
+    }
 
     /// <summary>
     /// Randomizes a fleet on the given board using the Builder pattern.
     /// Uses FleetDirector with RandomFleetBuilder to construct the fleet.
+    /// Uses the configured ship type (Classic or Modern) to create ships.
     /// </summary>
     public void RandomizeFleet(Board board)
     {
+        // Create the appropriate factory based on ship type
+        IShipFactory factory = _shipType switch
+        {
+            ShipType.Modern => new ModernShipFactory(),
+            _ => new ClassicShipFactory()
+        };
+
         // Use Builder pattern: Director orchestrates construction with Random builder
-        var builder = new RandomFleetBuilder(board);
+        var builder = new RandomFleetBuilder(board, factory);
         _director.SetBuilder(builder);
         _director.Construct(); // Director calls BuildPart() for each ship in fleet composition
     }

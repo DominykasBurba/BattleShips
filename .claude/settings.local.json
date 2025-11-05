@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)",
+      "Bash(dotnet build:*)",
+      "Bash(cat:*)",
+      "Bash(del \"BattleShips\\Domain\\Ships\\ShipFactory.cs\")",
+      "Bash(del \"BattleShips\\Domain\\Ships\\Factories\\AbstractFactoryDemo.cs\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

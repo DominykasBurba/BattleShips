@@ -145,9 +145,20 @@ public class GameSession : Subject
 
     private static bool HasCompleteFleet(Player p)
     {
-        // 1×4, 2×3, 3×2, 4×1
-        var expected = new[] { 4, 3, 3, 2, 2, 2, 1, 1, 1, 1 }.OrderBy(x => x).ToArray();
-        var actual = p.Board.Ships.Select(s => s.Length).OrderBy(x => x).ToArray();
-        return expected.SequenceEqual(actual);
+        // Check if fleet has correct composition based on ShipKind (not exact lengths)
+        // This supports both Classic and Modern ship families
+        var expectedComposition = Ships.DefaultFleet.Composition
+            .GroupBy(k => k)
+            .OrderBy(g => g.Key)
+            .Select(g => (Kind: g.Key, Count: g.Count()))
+            .ToArray();
+
+        var actualComposition = p.Board.Ships
+            .GroupBy(s => s.Kind)
+            .OrderBy(g => g.Key)
+            .Select(g => (Kind: g.Key, Count: g.Count()))
+            .ToArray();
+
+        return expectedComposition.SequenceEqual(actualComposition);
     }
 }
