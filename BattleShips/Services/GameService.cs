@@ -7,7 +7,6 @@ namespace BattleShips.Services;
 public class GameService
 {
     public GameSession? Session { get; private set; }
-    private readonly PlacementService _placement;
     private readonly IFleetPlacer _fleetPlacer;
 
     // RULE: when true, a player keeps the turn after Hit/Sunk; turn changes only on Miss/Invalid/AlreadyTried
@@ -22,10 +21,9 @@ public class GameService
     // still supported for "salvo" style; ignored when KeepTurnOnHit = true
     private int _shotsUsedThisTurn = 0;
 
-    public GameService(PlacementService placement)
+    public GameService(IFleetPlacer fleetPlacer)
     {
-        _placement = placement;
-        _fleetPlacer = new RandomFleetPlacerAdapter(_placement); // Adapter pattern
+        _fleetPlacer = fleetPlacer;
         _attackStrategy = GetStrategyForMode(ShootingMode);
     }
 
@@ -54,9 +52,9 @@ public class GameService
             _ = new Domain.Observer.GameEndObserver(Session);
         }
 
-        // Store ship type and skin for use in RandomizeFor
-        _placement.SetShipType(shipType);
-        _placement.SetShipSkin(shipSkin);
+        // Store ship type and skin for use in RandomizeFor via adapter
+        _fleetPlacer.SetShipType(shipType);
+        _fleetPlacer.SetShipSkin(shipSkin);
     }
 
     public void ResetShips()
