@@ -7,21 +7,16 @@ using BattleShips.Domain.Ships.Modern;
 /// Abstract base class for all ships. Implements IShip interface.
 /// This is the Component in the Decorator pattern.
 /// </summary>
-public abstract class ShipBase : IShip
+public abstract class ShipBase(Position start, Orientation orientation) : IShip
 {
     public abstract string Name { get; }
     public abstract int Length { get; }
 
-    public Position Start { get; private set; }
-    public Orientation Orientation { get; private set; }
+    public Position Start { get; private set; } = start;
+    public Orientation Orientation { get; private set; } = orientation;
     public virtual ShipSkin Skin => ShipSkin.Default;
 
-    protected readonly HashSet<Position> _hits = new();
-
-    protected ShipBase(Position start, Orientation orientation)
-    {
-        Start = start; Orientation = orientation;
-    }
+    private readonly HashSet<Position> _hits = [];
 
     public IEnumerable<Position> Cells()
     {
