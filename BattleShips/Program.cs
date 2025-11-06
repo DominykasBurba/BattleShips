@@ -10,6 +10,7 @@ builder.Services.AddSignalR();
 
 // your DI
 builder.Services.AddSingleton<BattleShips.Services.PlacementService>();
+builder.Services.AddTransient<BattleShips.Services.IFleetPlacer, BattleShips.Services.RandomFleetPlacerAdapter>();
 builder.Services.AddScoped<BattleShips.Services.GameService>();
 builder.Services.AddSingleton<BattleShips.Services.ChatService>();
 builder.Services.AddSingleton<BattleShips.Services.GameLobbyService>();
