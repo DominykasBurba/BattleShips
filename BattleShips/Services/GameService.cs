@@ -1,5 +1,6 @@
 using BattleShips.Domain;
 using BattleShips.Domain.AttackStrategies;
+using BattleShips.Domain.Ships;
 
 namespace BattleShips.Services;
 
@@ -7,6 +8,7 @@ public class GameService
 {
     public GameSession? Session { get; private set; }
     private readonly PlacementService _placement;
+    private readonly IFleetPlacer _fleetPlacer;
 
     // RULE: when true, a player keeps the turn after Hit/Sunk; turn changes only on Miss/Invalid/AlreadyTried
     public bool KeepTurnOnHit { get; set; } = true;
@@ -23,6 +25,7 @@ public class GameService
     public GameService(PlacementService placement)
     {
         _placement = placement;
+        _fleetPlacer = new RandomFleetPlacerAdapter(_placement); // Adapter pattern
         _attackStrategy = GetStrategyForMode(ShootingMode);
     }
 
@@ -36,7 +39,7 @@ public class GameService
         };
     }
 
-    public void NewLocalSession(int size = 10, bool enemyIsAi = true, ShipType shipType = ShipType.Classic)
+    public void NewLocalSession(int size = 10, bool enemyIsAi = true, ShipType shipType = ShipType.Classic, ShipSkin shipSkin = ShipSkin.Default)
     {
         var p1 = new HumanPlayer("Player 1", size);
         Player p2 = enemyIsAi ? new AiPlayer("Enemy AI", size) : new HumanPlayer("Player 2", size);
@@ -51,8 +54,9 @@ public class GameService
             _ = new Domain.Observer.GameEndObserver(Session);
         }
 
-        // Store ship type for use in RandomizeFor
+        // Store ship type and skin for use in RandomizeFor
         _placement.SetShipType(shipType);
+        _placement.SetShipSkin(shipSkin);
     }
 
     public void ResetShips()
@@ -70,7 +74,7 @@ public class GameService
     public void RandomizeFor(Player who)
     {
         if (Session is null) return;
-        _placement.RandomizeFleet(who.Board);
+        _fleetPlacer.PlaceFleet(who.Board);
     }
 
     public void SetShotsPerTurn(int n)

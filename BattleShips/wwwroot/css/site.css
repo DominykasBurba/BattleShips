@@ -83,6 +83,18 @@
     transition: all 0.2s ease;
 }
 
+/* Camouflage skin variant for own ships */
+.grid-cell.ship.camo {
+    background: repeating-linear-gradient(
+        45deg,
+        #7d8b6a,
+        #7d8b6a 6px,
+        #9aa57f 6px,
+        #9aa57f 12px
+    );
+    color: #fff;
+}
+
 .grid-cell.ship:hover {
     background: #a8d8a8;
     transform: scale(1.05);
@@ -96,6 +108,7 @@
 .grid-cell.hit  { background:#f66; color:#fff; font-weight:700; }
 .grid-cell.miss { background:#eef; color:#335; }
 .grid-cell.sunk { background:#b00; color:#fff; font-weight:900; }
+.grid-cell.shielded { background:#ffd966; color:#333; font-weight:700; }
 .grid.grid--disabled .grid-cell { pointer-events:none; opacity:.6; }
 
 .grid-cell.hit,

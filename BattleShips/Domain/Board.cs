@@ -7,17 +7,17 @@ public class Board
 {
     public int Size { get; }
     private readonly Cell[,] _cells;
-    private readonly List<ShipBase> _ships = new();
+    private readonly List<IShip> _ships = new();
     private readonly CellFactory _cellFactory;
 
-    public IReadOnlyList<ShipBase> Ships => _ships;
+    public IReadOnlyList<IShip> Ships => _ships;
 
     public Board(int size = 10, CellFactory? cellFactory = null)
     {
         Size = size;
         _cellFactory = cellFactory ?? new StandardCellFactory();
         _cells = new Cell[size, size];
-        
+
         // Use Factory Method pattern to create cells
         for (int r = 0; r < size; r++)
             for (int c = 0; c < size; c++)
@@ -33,12 +33,12 @@ public class Board
         for (int r = 0; r < Size; r++)
         for (int c = 0; c < Size; c++)
         {
-            _cells[r, c].Status = CellStatus.Empty;
-            _cells[r, c].Ship = null;
+            // Reset to basic cell
+            _cells[r, c] = _cellFactory.CreateCell(r, c);
         }
     }
 
-    public bool Place(ShipBase ship)
+    public bool Place(IShip ship)
     {
         if (!CanPlace(ship)) return false;
         _ships.Add(ship);
@@ -51,7 +51,7 @@ public class Board
         return true;
     }
 
-    public void Remove(ShipBase ship)
+    public void Remove(IShip ship)
     {
         if (!_ships.Remove(ship)) return;
         foreach (var p in ship.Cells())
@@ -65,7 +65,7 @@ public class Board
         }
     }
 
-    public bool CanPlace(ShipBase ship)
+    public bool CanPlace(IShip ship)
     {
         foreach (var p in ship.Cells())
         {
@@ -101,16 +101,30 @@ public class Board
         if (!p.InBounds(Size)) return ShotResult.Invalid;
         var cell = this[p];
 
-        if (cell.IsRevealed) return ShotResult.AlreadyTried;
+        // Allow re-shooting a Shielded cell (special case), but block other revealed cells
+        if (cell.IsRevealed && cell.Status != CellStatus.Shielded) return ShotResult.AlreadyTried;
 
-        if (cell.Status == CellStatus.Ship && cell.Ship is not null)
+        if ((cell.Status == CellStatus.Ship || cell.Status == CellStatus.Shielded) && cell.Ship is not null)
         {
             var ship = cell.Ship;
-            cell.Status = CellStatus.Hit;
-            ship.RegisterHit(p);
+            var damageApplied = ship.RegisterHit(p);
+            if (cell.Status == CellStatus.Ship)
+            {
+                if (!damageApplied)
+                {
+                    cell.Status = CellStatus.Shielded; // absorbed by camouflage
+                    return ShotResult.Hit;
+                }
+                cell.Status = CellStatus.Hit;
+            }
+            else if (cell.Status == CellStatus.Shielded)
+            {
+                // follow-up shot should apply damage now
+                cell.Status = CellStatus.Hit;
+            }
 
             if (!ship.IsSunk) return ShotResult.Hit;
-            
+
             foreach (var seg in ship.Cells())
                 this[seg].Status = CellStatus.Sunk;
             return ShotResult.Sunk;

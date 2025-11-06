@@ -1,6 +1,7 @@
 @page "/game"
 @rendermode InteractiveServer
 @using BattleShips.Domain
+@using BattleShips.Domain.Ships
 @inject BattleShips.Services.GameService GameService
 @inject NavigationManager Nav
 
@@ -307,6 +308,10 @@ else if (GameService.Session.Phase == Phase.Playing)
     [SupplyParameterFromQuery(Name = "shipType")]
     public string? ShipTypeParam { get; set; }
 
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "skin")]
+    public string? SkinParam { get; set; }
+
     protected override void OnInitialized()
     {
         // If no session exists, create one from query parameter
@@ -321,7 +326,14 @@ else if (GameService.Session.Phase == Phase.Playing)
                 shipType = parsedShipType;
             }
 
-            GameService.NewLocalSession(size, enemyIsAi: true, shipType: shipType);
+            // Parse ship skin from query parameter
+            ShipSkin shipSkin = ShipSkin.Default;
+            if (!string.IsNullOrEmpty(SkinParam) && Enum.TryParse<ShipSkin>(SkinParam, out var parsedSkin))
+            {
+                shipSkin = parsedSkin;
+            }
+
+            GameService.NewLocalSession(size, enemyIsAi: true, shipType: shipType, shipSkin: shipSkin);
 
             if (GameService.Session != null)
             {

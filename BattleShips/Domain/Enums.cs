@@ -1,6 +1,6 @@
 namespace BattleShips.Domain;
 
-public enum CellStatus { Empty, Ship, Hit, Miss, Sunk }
+public enum CellStatus { Empty, Ship, Hit, Miss, Sunk, Shielded }
 public enum Orientation { Horizontal, Vertical }
 public enum ShotResult { Invalid, AlreadyTried, Miss, Hit, Sunk }
 public enum Phase { Preparation, Playing, Finished }

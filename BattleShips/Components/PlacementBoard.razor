@@ -47,7 +47,7 @@
     [Parameter] public ShipKind? SelectedShip { get; set; }
     [Parameter] public IShipFactory? ShipFactory { get; set; }
 
-    private ShipBase? _last;
+    private IShip? _last;
     private IShipFactory _factory => ShipFactory ?? new ClassicShipFactory();
 
     private async Task Click(int r, int c)
@@ -120,7 +120,7 @@
         // Ship couldn't be placed - maybe show a message or visual feedback
     }
 
-    private async Task RotateShip(ShipBase ship)
+    private async Task RotateShip(IShip ship)
     {
         // Remove the ship from the board
         Board.Remove(ship);
@@ -146,7 +146,7 @@
         }
     }
 
-    private async Task RemoveShip(ShipBase ship)
+    private async Task RemoveShip(IShip ship)
     {
         // Remove the ship from the board
         Board.Remove(ship);

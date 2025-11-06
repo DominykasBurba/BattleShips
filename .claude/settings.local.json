@@ -6,7 +6,9 @@
       "Bash(dotnet build:*)",
       "Bash(cat:*)",
       "Bash(del \"BattleShips\\Domain\\Ships\\ShipFactory.cs\")",
-      "Bash(del \"BattleShips\\Domain\\Ships\\Factories\\AbstractFactoryDemo.cs\")"
+      "Bash(del \"BattleShips\\Domain\\Ships\\Factories\\AbstractFactoryDemo.cs\")",
+      "Bash(del \"BattleShips\\Domain\\Ships\\Decorators\\ShieldedShipDecorator.cs\")",
+      "Bash(del \"BattleShips\\Domain\\Ships\\Decorators\\RadarShipDecorator.cs\")"
     ],
     "deny": [],
     "ask": []

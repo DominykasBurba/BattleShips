@@ -9,6 +9,7 @@ public class PlacementService
 {
     private readonly FleetDirector _director = new();
     private ShipType _shipType = ShipType.Classic;
+    private ShipSkin _shipSkin = ShipSkin.Default;
 
     /// <summary>
     /// Sets the ship type to use for future fleet randomizations.
@@ -16,6 +17,14 @@ public class PlacementService
     public void SetShipType(ShipType shipType)
     {
         _shipType = shipType;
+    }
+
+    /// <summary>
+    /// Sets the ship skin to use for future fleet randomizations.
+    /// </summary>
+    public void SetShipSkin(ShipSkin shipSkin)
+    {
+        _shipSkin = shipSkin;
     }
 
     /// <summary>
@@ -33,7 +42,7 @@ public class PlacementService
         };
 
         // Use Builder pattern: Director orchestrates construction with Random builder
-        var builder = new RandomFleetBuilder(board, factory);
+        var builder = new RandomFleetBuilder(board, factory, _shipSkin);
         _director.SetBuilder(builder);
         _director.Construct(); // Director calls BuildPart() for each ship in fleet composition
     }
@@ -41,12 +50,12 @@ public class PlacementService
     /// <summary>
     /// Attempts to place a ship on the board.
     /// </summary>
-    public bool TryPlace(Board board, ShipBase ship) => board.Place(ship);
+    public bool TryPlace(Board board, IShip ship) => board.Place(ship);
 
     /// <summary>
     /// Attempts to rotate a ship on the board.
     /// </summary>
-    public bool TryRotate(Board board, ShipBase ship)
+    public bool TryRotate(Board board, IShip ship)
     {
         board.Remove(ship);
         var newO = ship.Orientation == Orientation.Horizontal ? Orientation.Vertical : Orientation.Horizontal;
