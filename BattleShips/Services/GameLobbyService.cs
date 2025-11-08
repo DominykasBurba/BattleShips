@@ -235,6 +235,23 @@ public class GameLobbyService(PlacementService placementService)
         return gameId;
     }
 
+    /// <summary>
+    /// Gets the player name for a given connection ID.
+    /// Returns "Player 1" if the connection is Player 1, "Player 2" if Player 2.
+    /// </summary>
+    public string? GetPlayerName(string gameId, string connectionId)
+    {
+        if (!_games.TryGetValue(gameId, out var session))
+            return null;
+
+        if (connectionId == session.Player1ConnectionId)
+            return "Player 1";
+        if (connectionId == session.Player2ConnectionId)
+            return "Player 2";
+        
+        return null;
+    }
+
     public void RemovePlayer(string connectionId)
     {
         if (_connectionToGame.TryRemove(connectionId, out var gameId))
