@@ -27,16 +27,30 @@
 
     private string text = string.Empty;
     private readonly ChatInvoker _invoker = new();
+    private string? _myConnectionId;
 
     protected override void OnInitialized()
     {
-        Chat.Updated += StateHasChanged;
+        // Subscribe to chat updates
+        Chat.Updated += OnChatUpdated;
+    }
+
+    private void OnChatUpdated()
+    {
+        // Use InvokeAsync to ensure StateHasChanged is called on the UI thread
+        _ = InvokeAsync(StateHasChanged);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender && HubConnection != null)
         {
+            // Store our connection ID immediately when available
+            if (string.IsNullOrEmpty(_myConnectionId))
+            {
+                _myConnectionId = HubConnection.ConnectionId;
+            }
+            
             // Register SignalR handler for receiving messages (only if online mode)
             HubConnection.On<string, string>("ReceiveMessage", OnMessageReceived);
             StateHasChanged();
@@ -45,10 +59,17 @@
 
     public void Dispose()
     {
-        Chat.Updated -= StateHasChanged;
-        if (HubConnection != null)
+        Chat.Updated -= OnChatUpdated;
+        if (HubConnection != null && HubConnection.State != HubConnectionState.Disconnected)
         {
-            HubConnection.Remove("ReceiveMessage");
+            try
+            {
+                HubConnection.Remove("ReceiveMessage");
+            }
+            catch (ObjectDisposedException)
+            {
+                // HubConnection already disposed, ignore
+            }
         }
     }
 
@@ -58,15 +79,29 @@
     /// </summary>
     private void OnMessageReceived(string senderId, string message)
     {
-        // Skip if this is our own message (we already added it locally via Command Pattern)
-        if (senderId == HubConnection?.ConnectionId)
+        // Use InvokeAsync to ensure we're on the UI thread
+        _ = InvokeAsync(() =>
         {
-            return;
-        }
+            // Ensure we have our connection ID
+            if (string.IsNullOrEmpty(_myConnectionId) && HubConnection != null)
+            {
+                _myConnectionId = HubConnection.ConnectionId;
+            }
+            
+            // Skip if this is our own message (we already added it locally via Command Pattern)
+            if (!string.IsNullOrEmpty(_myConnectionId) && senderId == _myConnectionId)
+            {
+                return;
+            }
 
-        // Use Command Pattern to add received message from opponent
-        var command = new SendMessageCommand(Chat, "Opponent", message);
-        _invoker.RunCommand(command);
+            // Determine sender name based on our PlayerName
+            // If we're Player 1, sender must be Player 2, and vice versa
+            var senderName = PlayerName == "Player 1" ? "Player 2" : "Player 1";
+
+            // Use Command Pattern to add received message
+            var command = new SendMessageCommand(Chat, senderName, message);
+            _invoker.RunCommand(command);
+        });
     }
 
     /// <summary>
@@ -78,8 +113,16 @@
     {
         if (string.IsNullOrWhiteSpace(text)) return;
         
+        var messageText = text.Trim();
+        
+        // Ensure we have our connection ID before sending
+        if (string.IsNullOrEmpty(_myConnectionId) && HubConnection != null)
+        {
+            _myConnectionId = HubConnection.ConnectionId;
+        }
+        
         // Client creates the command
-        var command = new SendMessageCommand(Chat, PlayerName, text);
+        var command = new SendMessageCommand(Chat, PlayerName, messageText);
         
         // Client passes command to invoker (executes locally via Command Pattern)
         _invoker.RunCommand(command);
@@ -89,7 +132,7 @@
         {
             try
             {
-                await HubConnection.InvokeAsync("SendMessage", GameId, text);
+                await HubConnection.InvokeAsync("SendMessage", GameId, messageText);
             }
             catch (Exception ex)
             {

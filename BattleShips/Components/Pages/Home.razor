@@ -609,6 +609,7 @@ else if (_opponent == OpponentKind.Human && _gameId != null)
                 _opponentJoined = false;
                 _isReady = false;
                 _opponentReady = false;
+                _playerName = "Player 1"; // Player who creates game is Player 1
                 StateHasChanged();
             }
             catch (Exception ex)
@@ -637,6 +638,7 @@ else if (_opponent == OpponentKind.Human && _gameId != null)
                 _opponentJoined = true;
                 _isReady = false;
                 _opponentReady = false;
+                _playerName = "Player 2"; // Player who joins game is Player 2
                 StateHasChanged();
             }
             else

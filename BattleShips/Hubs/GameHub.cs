@@ -129,6 +129,8 @@ public class GameHub(GameLobbyService lobby) : Hub
 
     public async Task SendMessage(string gameId, string message)
     {
+        // Send to all clients in the group (including sender) so everyone sees the message
+        // But we'll use the sender's connection ID to identify who sent it
         await Clients.Group(gameId).SendAsync("ReceiveMessage", Context.ConnectionId, message);
     }
 }
