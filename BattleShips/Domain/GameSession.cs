@@ -5,11 +5,16 @@ namespace BattleShips.Domain;
 /// <summary>
 /// ConcreteSubject in Observer pattern.
 /// Manages game state and notifies observers when state changes.
+/// Implements Singleton pattern to ensure only one instance exists.
 /// </summary>
 public class GameSession : Subject
 {
-    public Player P1 { get; }
-    public Player P2 { get; }
+    // Singleton instance
+    private static GameSession? _instance;
+    private static readonly object _lock = new object();
+
+    public Player P1 { get; private set; }
+    public Player P2 { get; private set; }
     
     private Phase _phase = Phase.Preparation;
     private Player _current;
@@ -72,11 +77,67 @@ public class GameSession : Subject
 
     public int ShotsPerTurn { get; private set; } = 1;
 
-    public GameSession(Player p1, Player p2)
+    /// <summary>
+    /// Private constructor for Singleton pattern.
+    /// Prevents external instantiation of GameSession.
+    /// </summary>
+    private GameSession(Player p1, Player p2)
     {
         P1 = p1; 
         P2 = p2; 
         _current = P1;
+    }
+
+    /// <summary>
+    /// Gets the Singleton instance of GameSession.
+    /// Creates a new instance if it doesn't exist.
+    /// </summary>
+    /// <param name="p1">First player</param>
+    /// <param name="p2">Second player</param>
+    /// <returns>The Singleton instance of GameSession</returns>
+    public static GameSession GetInstance(Player p1, Player p2)
+    {
+        if (_instance == null)
+        {
+            lock (_lock)
+            {
+                if (_instance == null)
+                {
+                    _instance = new GameSession(p1, p2);
+                }
+            }
+        }
+        else
+        {
+            // If instance exists, reinitialize it with new players
+            _instance.Initialize(p1, p2);
+        }
+        return _instance;
+    }
+
+    /// <summary>
+    /// Reinitializes the Singleton instance with new players.
+    /// </summary>
+    private void Initialize(Player p1, Player p2)
+    {
+        P1 = p1;
+        P2 = p2;
+        _current = P1;
+        _phase = Phase.Preparation;
+        _winner = null;
+        _draw = DrawState.None;
+        ShotsPerTurn = 1;
+    }
+
+    /// <summary>
+    /// Resets the Singleton instance (for testing or cleanup).
+    /// </summary>
+    public static void ResetInstance()
+    {
+        lock (_lock)
+        {
+            _instance = null;
+        }
     }
 
     public bool TryStart()

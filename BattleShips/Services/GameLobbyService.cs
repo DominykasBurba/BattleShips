@@ -284,7 +284,7 @@ public class OnlineGameSession
         ShotsUsedThisTurn = 0;
         var p1 = new HumanPlayer("Player 1", boardSize);
         var p2 = new HumanPlayer("Player 2", boardSize);
-        GameSession = new GameSession(p1, p2);
+        GameSession = Domain.GameSession.GetInstance(p1, p2); // Use Singleton pattern
 
         // Attach observers to the session (Observer pattern)
         _ = new GameStateObserver(GameSession);

@@ -437,6 +437,13 @@ else if (_opponent == OpponentKind.Human && _gameId != null)
                 }
             </div>
         </div>
+
+        @if (_opponentJoined && !string.IsNullOrEmpty(_gameId))
+        {
+            <div class="mt-3">
+                <ChatBox HubConnection="@_hubConnection" GameId="@_gameId" PlayerName="@_playerName" />
+            </div>
+        }
     }
     else if (_onlinePhase == Phase.Playing)
     {
@@ -491,6 +498,13 @@ else if (_opponent == OpponentKind.Human && _gameId != null)
         <div class="mt-3">
             <strong>Last shot:</strong> @_lastShot
         </div>
+
+        @if (!string.IsNullOrEmpty(_gameId))
+        {
+            <div class="mt-3">
+                <ChatBox HubConnection="@_hubConnection" GameId="@_gameId" PlayerName="@_playerName" />
+            </div>
+        }
     }
     else if (_onlinePhase == Phase.Finished)
     {
@@ -539,6 +553,7 @@ else if (_opponent == OpponentKind.Human && _gameId != null)
     private ShootingMode _shootingMode = ShootingMode.Single;
     private ShipType _shipType = ShipType.Classic;
     private readonly PlacementService _placementService = new();
+    private string _playerName = "You";
 
     protected override async Task OnInitializedAsync()
     {

@@ -1,5 +1,6 @@
 @using BattleShips.Services
 @using BattleShips.Domain.Commands
+@using Microsoft.AspNetCore.SignalR.Client
 @inject ChatService Chat
 @implements IDisposable
 
@@ -20,25 +21,83 @@
 </div>
 
 @code {
+    [Parameter] public HubConnection? HubConnection { get; set; }
+    [Parameter] public string? GameId { get; set; }
+    [Parameter] public string PlayerName { get; set; } = "Player 1";
+
     private string text = string.Empty;
     private readonly ChatInvoker _invoker = new();
 
-    protected override void OnInitialized() => Chat.Updated += StateHasChanged;
-    public void Dispose() => Chat.Updated -= StateHasChanged;
+    protected override void OnInitialized()
+    {
+        Chat.Updated += StateHasChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && HubConnection != null)
+        {
+            // Register SignalR handler for receiving messages (only if online mode)
+            HubConnection.On<string, string>("ReceiveMessage", OnMessageReceived);
+            StateHasChanged();
+        }
+    }
+
+    public void Dispose()
+    {
+        Chat.Updated -= StateHasChanged;
+        if (HubConnection != null)
+        {
+            HubConnection.Remove("ReceiveMessage");
+        }
+    }
+
+    /// <summary>
+    /// Handles incoming messages from SignalR and adds them using Command Pattern.
+    /// This preserves the Command Pattern even for received messages.
+    /// </summary>
+    private void OnMessageReceived(string senderId, string message)
+    {
+        // Skip if this is our own message (we already added it locally via Command Pattern)
+        if (senderId == HubConnection?.ConnectionId)
+        {
+            return;
+        }
+
+        // Use Command Pattern to add received message from opponent
+        var command = new SendMessageCommand(Chat, "Opponent", message);
+        _invoker.RunCommand(command);
+    }
 
     /// <summary>
     /// Client method: Creates a command and passes it to the invoker.
     /// This demonstrates the Command Pattern where Client -> Invoker -> Command -> Receiver.
+    /// After local execution, sends via SignalR if in online mode.
     /// </summary>
-    private void Send()
+    private async Task Send()
     {
         if (string.IsNullOrWhiteSpace(text)) return;
         
         // Client creates the command
-        var command = new SendMessageCommand(Chat, "Player 1", text);
+        var command = new SendMessageCommand(Chat, PlayerName, text);
         
-        // Client passes command to invoker
+        // Client passes command to invoker (executes locally via Command Pattern)
         _invoker.RunCommand(command);
+        
+        // If in online mode, also send via SignalR
+        if (HubConnection != null && !string.IsNullOrEmpty(GameId))
+        {
+            try
+            {
+                await HubConnection.InvokeAsync("SendMessage", GameId, text);
+            }
+            catch (Exception ex)
+            {
+                // If SignalR send fails, we could undo the command, but for simplicity we'll just log
+                // The message is already added locally via Command Pattern
+                Console.WriteLine($"Failed to send message via SignalR: {ex.Message}");
+            }
+        }
         
         text = string.Empty;
     }

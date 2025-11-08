@@ -40,7 +40,7 @@ public class GameService
     {
         var p1 = new HumanPlayer("Player 1", size);
         Player p2 = enemyIsAi ? new AiPlayer("Enemy AI", size) : new HumanPlayer("Player 2", size);
-        Session = new GameSession(p1, p2);
+        Session = GameSession.GetInstance(p1, p2); // Use Singleton pattern
         _shotsUsedThisTurn = 0;
 
         // Attach observers to the session (Observer pattern)
