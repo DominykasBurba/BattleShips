@@ -7,19 +7,19 @@ namespace BattleShips.Domain.Ships.Factories;
 /// </summary>
 public class ClassicShipFactory : IShipFactory
 {
-    public ShipBase CreateBattleship(Position start, Orientation orientation)
+    public IShip CreateBattleship(Position start, Orientation orientation)
         => new Battleship(start, orientation);
 
-    public ShipBase CreateSubmarine(Position start, Orientation orientation)
+    public IShip CreateSubmarine(Position start, Orientation orientation)
         => new Submarine(start, orientation);
 
-    public ShipBase CreateDestroyer(Position start, Orientation orientation)
+    public IShip CreateDestroyer(Position start, Orientation orientation)
         => new Destroyer(start, orientation);
 
-    public ShipBase CreateCruiser(Position start, Orientation orientation)
+    public IShip CreateCruiser(Position start, Orientation orientation)
         => new Cruiser(start, orientation);
 
-    public ShipBase CreateShip(ShipKind kind, Position start, Orientation orientation) => kind switch
+    public IShip CreateShip(ShipKind kind, Position start, Orientation orientation) => kind switch
     {
         ShipKind.Battleship => CreateBattleship(start, orientation),
         ShipKind.Submarine => CreateSubmarine(start, orientation),

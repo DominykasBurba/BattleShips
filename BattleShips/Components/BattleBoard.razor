@@ -1,4 +1,5 @@
 @using BattleShips.Domain
+@using BattleShips.Domain.Cells
 @using BattleShips.Services
 @inject GameService Game
 
@@ -62,9 +63,20 @@
             CellStatus.Hit  => $"{baseCls} hit",
             CellStatus.Miss => $"{baseCls} miss",
             CellStatus.Sunk => $"{baseCls} sunk",
+            CellStatus.Shielded => $"{baseCls} shielded",
             CellStatus.Ship when own => $"{baseCls} ship",
             _ => baseCls
         };
+
+        // If showing own ships, add skin-based class names for styling
+        if (own && cell.Ship is not null && cell.Status == CellStatus.Ship)
+        {
+            var skin = cell.Ship.Skin;
+            if (skin == ShipSkin.Camouflage)
+            {
+                statusCss += " camo";
+            }
+        }
 
         // Add 3x3 preview styling when in 3x3 mode and hovering
         if (Game.ShootingMode == ShootingMode.Salvo3x3 && !own && Interactable)
@@ -81,6 +93,7 @@
         CellStatus.Hit  => "✖",
         CellStatus.Miss => "•",
         CellStatus.Sunk => "☒",
+        CellStatus.Shielded => "🛡",
         CellStatus.Ship when own => "■",
         _ => ""
     };

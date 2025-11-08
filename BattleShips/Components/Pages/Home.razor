@@ -1,6 +1,7 @@
 @page "/"
 @rendermode InteractiveServer
 @using BattleShips.Domain
+@using BattleShips.Domain.Ships
 @using Microsoft.AspNetCore.SignalR.Client
 @using BattleShips.Hubs
 @inject BattleShips.Services.GameService Game
@@ -334,6 +335,13 @@
                 <option value="@ShipType.Modern">Modern (Larger ships)</option>
             </select>
         </div>
+        <div class="settings-row">
+            <span class="settings-label">Ship Skin:</span>
+            <select class="custom-select" @bind="_shipSkin">
+                <option value="@ShipSkin.Default">Default (Standard)</option>
+                <option value="@ShipSkin.Camouflage">Camouflage (+1 extra hit)</option>
+            </select>
+        </div>
         <div style="text-align: center; margin-top: 2rem;">
             <button class="btn btn-modern btn-primary-modern" @onclick="CreateGame">
                 @(_opponent == OpponentKind.Bot ? "Start Game" : "Create Online Game")
@@ -552,6 +560,7 @@ else if (_opponent == OpponentKind.Human && _gameId != null)
     private string _lastShot = "—";
     private ShootingMode _shootingMode = ShootingMode.Single;
     private ShipType _shipType = ShipType.Classic;
+    private ShipSkin _shipSkin = ShipSkin.Default;
     private readonly PlacementService _placementService = new();
     private string _playerName = "You";
 
@@ -583,8 +592,8 @@ else if (_opponent == OpponentKind.Human && _gameId != null)
 
         if (_opponent == OpponentKind.Bot)
         {
-            // Navigate to game page with board size, shooting mode, and ship type parameters
-            Nav.NavigateTo($"/game?size={_size}&mode={_shootingMode}&shipType={_shipType}");
+            // Navigate to game page with board size, shooting mode, ship type, and skin parameters
+            Nav.NavigateTo($"/game?size={_size}&mode={_shootingMode}&shipType={_shipType}&skin={_shipSkin}");
         }
         else
         {

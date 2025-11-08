@@ -155,7 +155,7 @@ public class GameLobbyService(PlacementService placementService)
         var attackResult = strategy.ExecuteAttack(session.GameSession, centerPosition);
 
         // Get sunk ships information
-        var sunkShipsSet = new HashSet<ShipBase>();
+        var sunkShipsSet = new HashSet<IShip>();
         var targetBoard = session.GameSession.Opponent.Board;
         
         for (int i = 0; i < attackResult.Positions.Count; i++)

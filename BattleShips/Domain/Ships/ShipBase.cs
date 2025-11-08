@@ -3,20 +3,20 @@ namespace BattleShips.Domain.Ships;
 using BattleShips.Domain;
 using BattleShips.Domain.Ships.Modern;
 
-public abstract class ShipBase
+/// <summary>
+/// Abstract base class for all ships. Implements IShip interface.
+/// This is the Component in the Decorator pattern.
+/// </summary>
+public abstract class ShipBase(Position start, Orientation orientation) : IShip
 {
     public abstract string Name { get; }
     public abstract int Length { get; }
 
-    public Position Start { get; private set; }
-    public Orientation Orientation { get; private set; }
+    public Position Start { get; private set; } = start;
+    public Orientation Orientation { get; private set; } = orientation;
+    public virtual ShipSkin Skin => ShipSkin.Default;
 
-    protected readonly HashSet<Position> _hits = new();
-
-    protected ShipBase(Position start, Orientation orientation)
-    {
-        Start = start; Orientation = orientation;
-    }
+    private readonly HashSet<Position> _hits = [];
 
     public IEnumerable<Position> Cells()
     {
@@ -32,8 +32,17 @@ public abstract class ShipBase
         _hits.Clear();
     }
 
-    public virtual void RegisterHit(Position p) => _hits.Add(p);
+    public virtual bool RegisterHit(Position p)
+    {
+        var added = _hits.Add(p);
+        return added;
+    }
     public virtual bool IsSunk => _hits.Count >= Length;
+
+    /// <summary>
+    /// Gets the number of hits this ship has taken.
+    /// </summary>
+    public int HitCount => _hits.Count;
 
     public ShipKind Kind => this switch
     {
