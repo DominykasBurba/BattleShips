@@ -44,7 +44,7 @@ public class GameService
         Session = GameSession.GetInstance(p1, p2); // Use Singleton pattern
         _shotsUsedThisTurn = 0;
 
-        // Attach observers to the session (Observer pattern)
+        // inicializuojam savo observerius
         if (Session != null)
         {
             _ = new Domain.Observer.GameStateObserver(Session);

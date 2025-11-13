@@ -29,7 +29,7 @@ public class GameSession : Subject
             if (_phase != value)
             {
                 _phase = value;
-                Notify(); // Notify observers of phase change
+                Notify(); // jeigu pasikeicia _phase, tai darom notify visiems observeriams
             }
         }
     }
@@ -42,7 +42,7 @@ public class GameSession : Subject
             if (!ReferenceEquals(_current, value))
             {
                 _current = value;
-                Notify(); // Notify observers of turn change
+                Notify(); // jeigu pasikeicia _phase, tai darom notify visiems observeriams
             }
         }
     }
@@ -57,7 +57,7 @@ public class GameSession : Subject
             if (_winner != value)
             {
                 _winner = value;
-                Notify(); // Notify observers of winner change
+                Notify(); // jeigu pasikeicia _phase, tai darom notify visiems observeriams
             }
         }
     }
@@ -70,7 +70,7 @@ public class GameSession : Subject
             if (_draw != value)
             {
                 _draw = value;
-                Notify(); // Notify observers of draw state change
+                Notify(); // jeigu pasikeicia _phase, tai darom notify visiems observeriams
             }
         }
     }
