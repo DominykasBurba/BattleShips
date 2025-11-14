@@ -109,7 +109,6 @@ public class GameSession : Subject
         }
         else
         {
-            // If instance exists, reinitialize it with new players
             _instance.Initialize(p1, p2);
         }
         return _instance;
