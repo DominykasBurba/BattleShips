@@ -20,10 +20,9 @@ public class GameEndObserver : IObserver
 
     public void Update()
     {
-        // Observer retrieves state from subject (as per diagram: observerState = subject->getState())
         _observerState = _subject.Winner;
         
-        // React to game end
+        // jeigu naujas state po update yra finished, reaguojam su logu.
         if (_subject.Phase == Phase.Finished)
         {
             if (_observerState != null)
