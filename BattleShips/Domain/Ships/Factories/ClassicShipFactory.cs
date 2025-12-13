@@ -1,10 +1,6 @@
 namespace BattleShips.Domain.Ships.Factories;
 
-/// <summary>
-/// Concrete Factory for creating classic battleship game ships.
-/// Part of the Abstract Factory pattern - creates the "Classic" family of ships.
-/// This is the traditional Battleship game implementation.
-/// </summary>
+
 public class ClassicShipFactory : IShipFactory
 {
     public IShip CreateBattleship(Position start, Orientation orientation)
