@@ -1,5 +1,6 @@
 @using BattleShips.Domain
 @using BattleShips.Domain.Ships
+@using BattleShips.Domain.Proxy
 
 <div class="ship-status">
     <h6>@Title</h6>
@@ -17,7 +18,7 @@
 
 @code {
     [Parameter] public string Title { get; set; } = "Ships";
-    [Parameter] public Board Board { get; set; } = default!;
+    [Parameter] public IBoardView Board { get; set; } = default!;
 
     private List<ShipGroup> ShipGroups => GetShipGroups();
 
