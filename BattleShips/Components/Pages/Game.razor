@@ -220,7 +220,7 @@
                     <div class="alert alert-info">Bot fleet is ready (hidden).</div>
                     <button class="btn btn-modern btn-secondary-modern" @onclick="() => GameService.RandomizeFor(GameService.Session.P2)">Re-roll bot fleet</button>
                 </div>
-                <ShipStatus Title="Enemy Fleet" Board="@GameService.Session.P2.Board" />
+                <ShipStatus Title="Enemy Fleet" Board="@GameService.Session.P2BoardProxy" />
             </div>
         </div>
     </div>
@@ -254,7 +254,7 @@ else if (GameService.Session.Phase == Phase.Playing)
             <div class="d-flex align-items-start gap-3">
                 <div>
                     <h5>Enemy (bot)</h5>
-                    <BattleBoard Board="@GameService.Session.P2.Board"
+                    <BattleBoard Board="@GameService.Session.P2BoardProxy"
                                  Own="false"
                                  Interactable="@canShoot"
                                  OnFire="OnFireAtEnemy" />
@@ -263,7 +263,7 @@ else if (GameService.Session.Phase == Phase.Playing)
                         <small class="text-muted">Wait for your turn…</small>
                     }
                 </div>
-                <ShipStatus Title="Enemy Ships" Board="@GameService.Session.P2.Board" />
+                <ShipStatus Title="Enemy Ships" Board="@GameService.Session.P2BoardProxy" />
             </div>
         </div>
     </div>

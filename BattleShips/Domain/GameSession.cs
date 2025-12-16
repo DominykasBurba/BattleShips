@@ -1,5 +1,6 @@
 using BattleShips.Domain.Observer;
 using BattleShips.Domain.State;
+using BattleShips.Domain.Proxy;
 
 namespace BattleShips.Domain;
 
@@ -39,7 +40,19 @@ public class GameSession : Subject
     }
 
     public Player Opponent => Current == P1 ? P2 : P1;
-    
+
+    /// <summary>
+    /// Gets P2's board through a protection proxy (hides ship positions from P1).
+    /// Implements Proxy pattern for controlled access.
+    /// </summary>
+    public OpponentBoardProxy P2BoardProxy => new OpponentBoardProxy(P2.Board);
+
+    /// <summary>
+    /// Gets P1's board through a protection proxy (hides ship positions from P2).
+    /// Implements Proxy pattern for controlled access.
+    /// </summary>
+    public OpponentBoardProxy P1BoardProxy => new OpponentBoardProxy(P1.Board);
+
     public Player? Winner
     {
         get => _winner;

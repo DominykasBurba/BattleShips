@@ -1,14 +1,16 @@
 using BattleShips.Domain.Ships;
 using BattleShips.Domain.Cells;
 using BattleShips.Domain.Iterator;
+using BattleShips.Domain.Proxy;
 
 namespace BattleShips.Domain;
 
 /// <summary>
 /// Concrete aggregate in the Iterator pattern.
 /// Represents a game board with cells that can be iterated.
+/// Implements IBoardView as the real subject in the Proxy pattern.
 /// </summary>
-public class Board : IAggregate<Cell>
+public class Board : IAggregate<Cell>, IBoardView
 {
     public int Size { get; }
     private readonly Cell[,] _cells;
