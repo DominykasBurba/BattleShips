@@ -1,6 +1,7 @@
 @using BattleShips.Domain
 @using BattleShips.Domain.Cells
 @using BattleShips.Domain.Proxy
+@using BattleShips.Domain.Flyweight
 @using BattleShips.Services
 @inject GameService Game
 
@@ -28,11 +29,13 @@
                     var rr = r; var cc = c;                 // capture fix
 
                     var cell = Board[rr, cc];
-                    var css = CellCss(cell, Own, rr, cc);
-                    var text = CellText(cell, Own);
 
-                    <CellView CssClass="@css"
-                              Text="@text"
+                    // Use Flyweight pattern: Get shared appearance object instead of computing each time
+                    var skin = (Own && cell.Ship != null) ? cell.Ship.Skin : (ShipSkin?)null;
+                    var appearance = CellAppearanceFactory.Instance.GetAppearance(cell.Status, Own, skin);
+
+                    <CellView CssClass="@appearance.CssClass"
+                              Text="@appearance.DisplayText"
                               OnClick="@(() => Click(rr, cc))" />
                 }
             </div>
@@ -50,52 +53,15 @@
     {
         if (!Interactable || Own || OnFire is null) return Task.CompletedTask;
 
+        var cell = Board[r, c];
+
         // ⛔ block re-clicking a tried cell (hit/miss/sunk)
-        if (Board[r, c].IsRevealed) return Task.CompletedTask;
+        // BUT allow re-shooting Shielded cells to break the shield
+        if (cell.IsRevealed && cell.Status != CellStatus.Shielded) return Task.CompletedTask;
 
         return OnFire(new Position(r, c));
     }
 
-    private string CellCss(Cell cell, bool own, int row, int col)
-    {
-        var baseCls = "grid-cell";
-        var statusCss = cell.Status switch
-        {
-            CellStatus.Hit  => $"{baseCls} hit",
-            CellStatus.Miss => $"{baseCls} miss",
-            CellStatus.Sunk => $"{baseCls} sunk",
-            CellStatus.Shielded => $"{baseCls} shielded",
-            CellStatus.Ship when own => $"{baseCls} ship",
-            _ => baseCls
-        };
-
-        // If showing own ships, add skin-based class names for styling
-        if (own && cell.Ship is not null && cell.Status == CellStatus.Ship)
-        {
-            var skin = cell.Ship.Skin;
-            if (skin == ShipSkin.Camouflage)
-            {
-                statusCss += " camo";
-            }
-        }
-
-        // Add 3x3 preview styling when in 3x3 mode and hovering
-        if (Game.ShootingMode == ShootingMode.Salvo3x3 && !own && Interactable)
-        {
-            // This would need JavaScript hover events to work properly
-            // For now, we'll just return the base styling
-        }
-
-        return statusCss;
-    }
-
-    private static string CellText(Cell cell, bool own) => cell.Status switch
-    {
-        CellStatus.Hit  => "✖",
-        CellStatus.Miss => "•",
-        CellStatus.Sunk => "☒",
-        CellStatus.Shielded => "🛡",
-        CellStatus.Ship when own => "■",
-        _ => ""
-    };
+    // Old methods replaced by Flyweight pattern (CellAppearanceFactory)
+    // CellCss and CellText logic now handled by shared flyweight objects
 }

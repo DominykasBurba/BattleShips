@@ -3,40 +3,9 @@ using BattleShips.Domain.Ships;
 
 namespace BattleShips.Domain.Proxy;
 
-/// <summary>
-/// Protection Proxy pattern implementation.
-/// Controls access to opponent's board, hiding ship positions while allowing attacks.
-/// This prevents "cheating" by viewing opponent's ship placements.
-///
-/// USAGE EXAMPLE:
-/// <code>
-/// // Player 1 has their board
-/// Board player1Board = new Board();
-/// // ... player1 places ships ...
-///
-/// // Player 2 should not see player1's ship positions
-/// // Use proxy to provide controlled access
-/// OpponentBoardProxy opponentView = new OpponentBoardProxy(player1Board);
-///
-/// // Player 2 can attack
-/// var result = opponentView.FireAt(new Position(3, 4));
-///
-/// // Player 2 can see revealed cells (hits/misses)
-/// var cell = opponentView.GetCell(3, 4); // Shows hit/miss/sunk
-///
-/// // But unrevealed cells hide ship information
-/// var hiddenCell = opponentView.GetCell(5, 5); // Shows Empty even if ship is there
-///
-/// // Can check if all ships sunk
-/// if (opponentView.AllShipsSunk)
-/// {
-///     Console.WriteLine("Victory!");
-/// }
-/// </code>
-/// </summary>
-public class OpponentBoardProxy : IBoardView
+public class OpponentBoardProxy(Board realBoard) : IBoardView
 {
-    private readonly Board _realBoard;
+    private readonly Board _realBoard = realBoard ?? throw new ArgumentNullException(nameof(realBoard));
 
     public int Size => _realBoard.Size;
 
@@ -50,11 +19,6 @@ public class OpponentBoardProxy : IBoardView
     /// Implements IBoardView.Ships - filters to prevent revealing ship positions.
     /// </summary>
     public IReadOnlyList<IShip> Ships => _realBoard.Ships.Where(s => s.IsSunk).ToList();
-
-    public OpponentBoardProxy(Board realBoard)
-    {
-        _realBoard = realBoard ?? throw new ArgumentNullException(nameof(realBoard));
-    }
 
     /// <summary>
     /// Indexer for accessing cells - delegates to GetCell.
