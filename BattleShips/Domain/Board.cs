@@ -2,6 +2,7 @@ using BattleShips.Domain.Ships;
 using BattleShips.Domain.Cells;
 using BattleShips.Domain.Iterator;
 using BattleShips.Domain.Proxy;
+using BattleShips.Domain.Visitor;
 
 namespace BattleShips.Domain;
 
@@ -285,5 +286,32 @@ public class Board : IAggregate<Cell>, IBoardView
         }
 
         return allHits;
+    }
+
+    /// <summary>
+    /// Accepts a visitor and allows it to traverse the board (Visitor pattern).
+    /// The visitor will visit all cells and ships on the board.
+    /// </summary>
+    public void Accept(IBoardVisitor visitor)
+    {
+        // Visit all cells using Iterator pattern
+        IIterator<Cell> cellIterator = CreateIterator();
+        cellIterator.First();
+
+        while (!cellIterator.IsDone())
+        {
+            Cell cell = cellIterator.CurrentItem();
+            visitor.VisitCell(cell);
+            cellIterator.Next();
+        }
+
+        // Visit all ships
+        foreach (var ship in _ships)
+        {
+            visitor.VisitShip(ship);
+        }
+
+        // Notify visitor that traversal is complete
+        visitor.VisitComplete();
     }
 }
