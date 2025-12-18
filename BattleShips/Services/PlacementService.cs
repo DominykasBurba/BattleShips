@@ -3,6 +3,8 @@ using BattleShips.Domain.BoardBuilder;
 using BattleShips.Domain.Ships;
 using BattleShips.Domain.Ships.Factories;
 
+using BattleShips.Domain.Validation;
+
 namespace BattleShips.Services;
 
 public class PlacementService
@@ -10,6 +12,17 @@ public class PlacementService
     private readonly FleetDirector _director = new();
     private ShipType _shipType = ShipType.Classic;
     private ShipSkin _shipSkin = ShipSkin.Default;
+
+    private readonly ValidationHandler _placementValidator;
+
+    public PlacementService()
+    {
+        // Build validation chain: bounds -> overlap -> adjacency
+        _placementValidator = new BoundsValidationHandler();
+        _placementValidator
+            .SetNext(new OverlapValidationHandler())
+            .SetNext(new AdjacencyValidationHandler());
+    }
 
     /// <summary>
     /// Sets the ship type to use for future fleet randomizations.
@@ -48,9 +61,21 @@ public class PlacementService
     }
 
     /// <summary>
-    /// Attempts to place a ship on the board.
+    /// Attempts to place a ship on the board using validation chain.
     /// </summary>
-    public bool TryPlace(Board board, IShip ship) => board.Place(ship);
+    public bool TryPlace(Board board, IShip ship)
+    {
+        var ctx = new ValidationContext
+        {
+            Board = board,
+            Ship = ship
+        };
+
+        _placementValidator.Handle(ctx);
+        if (!ctx.IsValid) return false;
+
+        return board.Place(ship);
+    }
 
     /// <summary>
     /// Attempts to rotate a ship on the board.

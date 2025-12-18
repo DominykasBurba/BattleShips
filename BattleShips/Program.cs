@@ -14,6 +14,7 @@ builder.Services.AddTransient<BattleShips.Services.IFleetPlacer, BattleShips.Ser
 builder.Services.AddScoped<BattleShips.Services.GameService>();
 builder.Services.AddSingleton<BattleShips.Services.ChatService>();
 builder.Services.AddSingleton<BattleShips.Services.GameLobbyService>();
+builder.Services.AddScoped<BattleShips.Services.IGameMediator, BattleShips.Services.GameMediator>();
 
 var app = builder.Build();
 

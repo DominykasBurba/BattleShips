@@ -2,9 +2,6 @@ using BattleShips.Domain.Ships;
 
 namespace BattleShips.Domain;
 
-/// <summary>
-/// Represents a cell on the board with position and ship information.
-/// </summary>
 public class Cell
 {
     public Position Pos { get; }

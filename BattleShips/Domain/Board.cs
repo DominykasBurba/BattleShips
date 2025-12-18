@@ -18,7 +18,6 @@ public class Board
         _cellFactory = cellFactory ?? new StandardCellFactory();
         _cells = new Cell[size, size];
 
-        // Use Factory Method pattern to create cells
         for (int r = 0; r < size; r++)
             for (int c = 0; c < size; c++)
                 _cells[r,c] = _cellFactory.CreateCell(r, c);

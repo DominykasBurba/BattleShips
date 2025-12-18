@@ -1,4 +1,6 @@
+using BattleShips.Domain.Memento;
 using BattleShips.Domain.Observer;
+using BattleShips.Domain.Ships;
 
 namespace BattleShips.Domain;
 
@@ -77,10 +79,7 @@ public class GameSession : Subject
 
     public int ShotsPerTurn { get; private set; } = 1;
 
-    /// <summary>
-    /// Private constructor for Singleton pattern.
-    /// Prevents external instantiation of GameSession.
-    /// </summary>
+
     private GameSession(Player p1, Player p2)
     {
         P1 = p1; 
@@ -88,13 +87,6 @@ public class GameSession : Subject
         _current = P1;
     }
 
-    /// <summary>
-    /// Gets the Singleton instance of GameSession.
-    /// Creates a new instance if it doesn't exist.
-    /// </summary>
-    /// <param name="p1">First player</param>
-    /// <param name="p2">Second player</param>
-    /// <returns>The Singleton instance of GameSession</returns>
     public static GameSession GetInstance(Player p1, Player p2)
     {
         if (_instance == null)
@@ -114,9 +106,6 @@ public class GameSession : Subject
         return _instance;
     }
 
-    /// <summary>
-    /// Reinitializes the Singleton instance with new players.
-    /// </summary>
     private void Initialize(Player p1, Player p2)
     {
         P1 = p1;
@@ -127,10 +116,6 @@ public class GameSession : Subject
         _draw = DrawState.None;
         ShotsPerTurn = 1;
     }
-
-    /// <summary>
-    /// Resets the Singleton instance (for testing or cleanup).
-    /// </summary>
     public static void ResetInstance()
     {
         lock (_lock)
@@ -203,11 +188,106 @@ public class GameSession : Subject
         }
     }
 
+    #region Memento pattern
+
+    /// <summary>
+    /// Creates a snapshot of the current game state.
+    /// </summary>
+    public GameSessionMemento CreateMemento()
+    {
+        var p1State = CreatePlayerState(P1);
+        var p2State = CreatePlayerState(P2);
+
+        return new GameSessionMemento
+        {
+            P1 = p1State,
+            P2 = p2State,
+            Phase = Phase,
+            CurrentPlayerName = Current.Name,
+            WinnerName = Winner?.Name,
+            Draw = Draw,
+            ShotsPerTurn = ShotsPerTurn
+        };
+    }
+
+    /// <summary>
+    /// Restores game state from a memento snapshot.
+    /// </summary>
+    public void Restore(GameSessionMemento memento)
+    {
+        RestorePlayerState(P1, memento.P1);
+        RestorePlayerState(P2, memento.P2);
+
+        Phase = memento.Phase;
+        Current = P1.Name == memento.CurrentPlayerName ? P1 : P2;
+        Winner = memento.WinnerName switch
+        {
+            null => null,
+            var name when name == P1.Name => P1,
+            var name when name == P2.Name => P2,
+            _ => null
+        };
+        Draw = memento.Draw;
+        ShotsPerTurn = memento.ShotsPerTurn;
+    }
+
+    private static PlayerStateDto CreatePlayerState(Player p)
+    {
+        var ships = p.Board.Ships.Select(s => new ShipStateDto
+        {
+            Kind = s.Kind,
+            Start = s.Start,
+            Orientation = s.Orientation,
+            IsSunk = s.IsSunk
+        }).ToList();
+
+        return new PlayerStateDto
+        {
+            Name = p.Name,
+            Kind = p.Kind,
+            BoardSize = p.Board.Size,
+            Ships = ships
+        };
+    }
+
+    private static void RestorePlayerState(Player player, PlayerStateDto dto)
+    {
+        player.Board.Clear();
+
+        foreach (var shipState in dto.Ships)
+        {
+            var ship = CreateShipFromState(shipState);
+            player.Board.Place(ship);
+
+            if (shipState.IsSunk)
+            {
+                foreach (var pos in ship.Cells())
+                {
+                    player.Board.FireAt(pos);
+                }
+            }
+        }
+    }
+
+    #endregion
+
+    private static IShip CreateShipFromState(ShipStateDto state)
+    {
+        return state.Kind switch
+        {
+            ShipKind.Battleship => new Battleship(state.Start, state.Orientation),
+            ShipKind.Submarine => new Submarine(state.Start, state.Orientation),
+            ShipKind.Destroyer => new Destroyer(state.Start, state.Orientation),
+            ShipKind.Cruiser => new Cruiser(state.Start, state.Orientation),
+            _ => throw new InvalidOperationException($"Unsupported ShipKind in memento: {state.Kind}")
+        };
+    }
+
     private static bool HasCompleteFleet(Player p)
     {
         // Check if fleet has correct composition based on ShipKind (not exact lengths)
         // This supports both Classic and Modern ship families
-        var expectedComposition = Ships.DefaultFleet.Composition
+        var expectedComposition = DefaultFleet.Composition
             .GroupBy(k => k)
             .OrderBy(g => g.Key)
             .Select(g => (Kind: g.Key, Count: g.Count()))

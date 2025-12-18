@@ -2,10 +2,7 @@ using BattleShips.Services;
 
 namespace BattleShips.Domain.Commands;
 
-/// <summary>
-/// Concrete Command class for sending a chat message.
-/// Implements Command pattern for sending messages to chat.
-/// </summary>
+
 public class SendMessageCommand : ICommand
 {
     private readonly ChatService _chatService;
@@ -20,9 +17,6 @@ public class SendMessageCommand : ICommand
         _text = text;
     }
 
-    /// <summary>
-    /// Executes the command by sending the message to chat.
-    /// </summary>
     public void Execute()
     {
         if (string.IsNullOrWhiteSpace(_text)) return;
@@ -32,9 +26,6 @@ public class SendMessageCommand : ICommand
         _chatService.SendMessage(_message);
     }
 
-    /// <summary>
-    /// Undoes the command by removing the last sent message.
-    /// </summary>
     public void Undo()
     {
         if (_message != null)
@@ -43,6 +34,8 @@ public class SendMessageCommand : ICommand
         }
     }
 }
+
+
 
 
 
