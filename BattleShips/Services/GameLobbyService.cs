@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using BattleShips.Domain;
 using BattleShips.Domain.AttackStrategies;
 using BattleShips.Domain.BoardBuilder;
+using BattleShips.Domain.GameInitialization;
 using BattleShips.Domain.Observer;
 using BattleShips.Domain.Ships.Factories;
 using BattleShips.Hubs;
@@ -299,14 +300,10 @@ public class OnlineGameSession
         ShootingMode = shootingMode;
         ShipType = shipType;
         ShotsUsedThisTurn = 0;
-        var p1 = new HumanPlayer("Player 1", boardSize);
-        var p2 = new HumanPlayer("Player 2", boardSize);
-        GameSession = Domain.GameSession.GetInstance(p1, p2); // Use Singleton pattern
-
-        // Attach observers to the session (Observer pattern)
-        _ = new GameStateObserver(GameSession);
-        _ = new TurnChangeObserver(GameSession);
-        _ = new GameEndObserver(GameSession);
+        
+        // Use Template Method pattern for game initialization
+        var initializer = new OnlineGameInitializer();
+        GameSession = initializer.InitializeGame(boardSize, shipType, shootingMode);
     }
 
     public Player? GetPlayer(string connectionId)

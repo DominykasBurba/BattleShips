@@ -293,3 +293,4 @@ Tai reiškia:
   - užtikrina, kad Undo / Chat / Game logika koordinuojama vienoje vietoje.
 
 
+

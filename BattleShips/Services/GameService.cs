@@ -1,5 +1,6 @@
 using BattleShips.Domain;
 using BattleShips.Domain.AttackStrategies;
+using BattleShips.Domain.GameInitialization;
 using BattleShips.Domain.Ships;
 
 namespace BattleShips.Services;
@@ -39,18 +40,10 @@ public class GameService
 
     public void NewLocalSession(int size = 10, bool enemyIsAi = true, ShipType shipType = ShipType.Classic, ShipSkin shipSkin = ShipSkin.Default)
     {
-        var p1 = new HumanPlayer("Player 1", size);
-        Player p2 = enemyIsAi ? new AiPlayer("Enemy AI", size) : new HumanPlayer("Player 2", size);
-        Session = GameSession.GetInstance(p1, p2); // Use Singleton pattern
+        // Use Template Method pattern for game initialization
+        var initializer = new LocalGameInitializer(enemyIsAi, shipSkin);
+        Session = initializer.InitializeGame(size, shipType, ShootingMode);
         _shotsUsedThisTurn = 0;
-
-        // inicializuojam savo observerius
-        if (Session != null)
-        {
-            _ = new Domain.Observer.GameStateObserver(Session);
-            _ = new Domain.Observer.TurnChangeObserver(Session);
-            _ = new Domain.Observer.GameEndObserver(Session);
-        }
 
         // Store ship type and skin for use in RandomizeFor via adapter
         _fleetPlacer.SetShipType(shipType);

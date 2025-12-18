@@ -1,9 +1,17 @@
 using BattleShips.Domain.Ships;
 using BattleShips.Domain.Cells;
+using BattleShips.Domain.Iterator;
+using BattleShips.Domain.Proxy;
+using BattleShips.Domain.Visitor;
 
 namespace BattleShips.Domain;
 
-public class Board
+/// <summary>
+/// Concrete aggregate in the Iterator pattern.
+/// Represents a game board with cells that can be iterated.
+/// Implements IBoardView as the real subject in the Proxy pattern.
+/// </summary>
+public class Board : IAggregate<Cell>, IBoardView
 {
     public int Size { get; }
     private readonly Cell[,] _cells;
@@ -29,11 +37,18 @@ public class Board
     public void Clear()
     {
         _ships.Clear();
-        for (int r = 0; r < Size; r++)
-        for (int c = 0; c < Size; c++)
+        
+        // Use Iterator pattern to iterate through all cells
+        IIterator<Cell> iterator = CreateIterator();
+        iterator.First();
+        
+        while (!iterator.IsDone())
         {
-            // Reset to basic cell
-            _cells[r, c] = _cellFactory.CreateCell(r, c);
+            Cell cell = iterator.CurrentItem();
+            // Reset to basic cell - need to recreate it at the same position
+            var pos = cell.Pos;
+            _cells[pos.Row, pos.Col] = _cellFactory.CreateCell(pos.Row, pos.Col);
+            iterator.Next();
         }
     }
 
@@ -133,5 +148,169 @@ public class Board
     }
 
 
-    public bool AllShipsSunk => _ships.Count > 0 && _ships.All(s => s.IsSunk);
+    public bool AllShipsSunk
+    {
+        get
+        {
+            if (_ships.Count == 0) return false;
+            
+            // Use Iterator pattern to iterate through all ships
+            ShipCollection shipCollection = new ShipCollection(_ships);
+            IIterator<IShip> iterator = shipCollection.CreateIterator();
+            
+            iterator.First();
+            while (!iterator.IsDone())
+            {
+                IShip ship = iterator.CurrentItem();
+                if (!ship.IsSunk)
+                {
+                    return false;
+                }
+                iterator.Next();
+            }
+            
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Creates an iterator for traversing all cells on the board.
+    /// Implements IAggregate<Cell> interface (Iterator pattern).
+    /// </summary>
+    /// <returns>An iterator for the board's cells</returns>
+    public IIterator<Cell> CreateIterator()
+    {
+        return new BoardCellIterator(_cells, Size);
+    }
+
+    /// <summary>
+    /// Example method demonstrating Iterator pattern usage.
+    /// Counts all revealed cells on the board using the iterator.
+    /// </summary>
+    public int CountRevealedCells()
+    {
+        IIterator<Cell> iterator = CreateIterator();
+        int count = 0;
+
+        iterator.First();
+        while (!iterator.IsDone())
+        {
+            Cell cell = iterator.CurrentItem();
+            if (cell.IsRevealed)
+            {
+                count++;
+            }
+            iterator.Next();
+        }
+
+        return count;
+    }
+
+    /// <summary>
+    /// Gets the count of active (non-sunk) ships using Iterator pattern.
+    /// Demonstrates ShipListIterator usage.
+    /// </summary>
+    public int GetActiveShipCount()
+    {
+        if (_ships.Count == 0) return 0;
+
+        // Use Iterator pattern to iterate through all ships
+        ShipCollection shipCollection = new ShipCollection(_ships);
+        IIterator<IShip> iterator = shipCollection.CreateIterator();
+        int count = 0;
+
+        iterator.First();
+        while (!iterator.IsDone())
+        {
+            IShip ship = iterator.CurrentItem();
+            if (!ship.IsSunk)
+            {
+                count++;
+            }
+            iterator.Next();
+        }
+
+        return count;
+    }
+
+    /// <summary>
+    /// Gets all hit positions from all ships using Iterator pattern.
+    /// Demonstrates both ShipListIterator and PositionSetIterator usage.
+    /// </summary>
+    public HashSet<Position> GetAllHitPositions()
+    {
+        HashSet<Position> allHits = new HashSet<Position>();
+
+        if (_ships.Count == 0) return allHits;
+
+        // Use Iterator pattern to iterate through all ships
+        ShipCollection shipCollection = new ShipCollection(_ships);
+        IIterator<IShip> shipIterator = shipCollection.CreateIterator();
+
+        shipIterator.First();
+        while (!shipIterator.IsDone())
+        {
+            IShip ship = shipIterator.CurrentItem();
+            
+            // For each ship, get its hit positions
+            // Since we can't access private _hits directly, we'll collect from cells
+            // But for demonstration, let's use the iterator pattern on ship positions
+            foreach (var pos in ship.Cells())
+            {
+                var cell = this[pos];
+                if (cell.Status == CellStatus.Hit || cell.Status == CellStatus.Sunk)
+                {
+                    allHits.Add(pos);
+                }
+            }
+            
+            shipIterator.Next();
+        }
+
+        // Use PositionSetIterator to iterate through collected hit positions
+        if (allHits.Count > 0)
+        {
+            PositionSet positionSet = new PositionSet(allHits);
+            IIterator<Position> positionIterator = positionSet.CreateIterator();
+            
+            // This demonstrates PositionSetIterator usage
+            // In a real scenario, you might process these positions
+            positionIterator.First();
+            while (!positionIterator.IsDone())
+            {
+                Position pos = positionIterator.CurrentItem();
+                // Could process each hit position here
+                positionIterator.Next();
+            }
+        }
+
+        return allHits;
+    }
+
+    /// <summary>
+    /// Accepts a visitor and allows it to traverse the board (Visitor pattern).
+    /// The visitor will visit all cells and ships on the board.
+    /// </summary>
+    public void Accept(IBoardVisitor visitor)
+    {
+        // Visit all cells using Iterator pattern
+        IIterator<Cell> cellIterator = CreateIterator();
+        cellIterator.First();
+
+        while (!cellIterator.IsDone())
+        {
+            Cell cell = cellIterator.CurrentItem();
+            visitor.VisitCell(cell);
+            cellIterator.Next();
+        }
+
+        // Visit all ships
+        foreach (var ship in _ships)
+        {
+            visitor.VisitShip(ship);
+        }
+
+        // Notify visitor that traversal is complete
+        visitor.VisitComplete();
+    }
 }

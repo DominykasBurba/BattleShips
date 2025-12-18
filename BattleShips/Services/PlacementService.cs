@@ -53,11 +53,11 @@ public class PlacementService
             ShipType.Modern => new ModernShipFactory(),
             _ => new ClassicShipFactory()
         };
-
-        // Use Builder pattern: Director orchestrates construction with Random builder
+        
+        // Builder randomizinam
         var builder = new RandomFleetBuilder(board, factory, _shipSkin);
         _director.SetBuilder(builder);
-        _director.Construct(); // Director calls BuildPart() for each ship in fleet composition
+        _director.Construct();
     }
 
     /// <summary>

@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @using BattleShips.Domain
 @using BattleShips.Domain.Ships
+@using BattleShips.Domain.Visitor
 @inject BattleShips.Services.GameService GameService
 @inject NavigationManager Nav
 
@@ -220,7 +221,7 @@
                     <div class="alert alert-info">Bot fleet is ready (hidden).</div>
                     <button class="btn btn-modern btn-secondary-modern" @onclick="() => GameService.RandomizeFor(GameService.Session.P2)">Re-roll bot fleet</button>
                 </div>
-                <ShipStatus Title="Enemy Fleet" Board="@GameService.Session.P2.Board" />
+                <ShipStatus Title="Enemy Fleet" Board="@GameService.Session.P2BoardProxy" />
             </div>
         </div>
     </div>
@@ -254,7 +255,7 @@ else if (GameService.Session.Phase == Phase.Playing)
             <div class="d-flex align-items-start gap-3">
                 <div>
                     <h5>Enemy (bot)</h5>
-                    <BattleBoard Board="@GameService.Session.P2.Board"
+                    <BattleBoard Board="@GameService.Session.P2BoardProxy"
                                  Own="false"
                                  Interactable="@canShoot"
                                  OnFire="OnFireAtEnemy" />
@@ -263,7 +264,7 @@ else if (GameService.Session.Phase == Phase.Playing)
                         <small class="text-muted">Wait for your turn…</small>
                     }
                 </div>
-                <ShipStatus Title="Enemy Ships" Board="@GameService.Session.P2.Board" />
+                <ShipStatus Title="Enemy Ships" Board="@GameService.Session.P2BoardProxy" />
             </div>
         </div>
     </div>
@@ -284,7 +285,32 @@ else if (GameService.Session.Phase == Phase.Playing)
             <h2>Game Over!</h2>
             <p>Winner: @(GameService.Session.Winner?.Name ?? "It's a Draw!")</p>
         </div>
-        <div style="text-align: center;">
+
+        <!-- Game Statistics using Visitor Pattern -->
+        <div class="row g-3 mt-3">
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">🎯 Your Performance</h5>
+                    </div>
+                    <div class="card-body">
+                        @RenderDamageReport()
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">📊 Battle Summary</h5>
+                    </div>
+                    <div class="card-body">
+                        @RenderBattleStatistics()
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 1rem;">
             <button class="btn btn-modern btn-primary-modern" @onclick="BackToLobby">Back to Lobby</button>
         </div>
     }
@@ -441,4 +467,121 @@ else if (GameService.Session.Phase == Phase.Playing)
         GameService.ClearSession();
         Nav.NavigateTo("/");
     }
+
+    /// <summary>
+    /// Uses Visitor pattern to render damage report with nice formatting.
+    /// </summary>
+    private RenderFragment RenderDamageReport() => __builder =>
+    {
+        if (GameService.Session is null) return;
+
+        var damageVisitor = new DamageReportVisitor();
+        GameService.Session.P2.Board.Accept(damageVisitor);
+
+        <div>
+            <div class="mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <strong>Accuracy</strong>
+                    <span class="badge bg-success">@damageVisitor.Accuracy.ToString("F1")%</span>
+                </div>
+                <div class="progress" style="height: 20px;">
+                    <div class="progress-bar bg-success" role="progressbar"
+                         style="width: @damageVisitor.Accuracy%"
+                         aria-valuenow="@damageVisitor.Accuracy" aria-valuemin="0" aria-valuemax="100">
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <small class="text-muted">
+                    Shots: @(damageVisitor.ShipDamageDetails.Sum(s => s.Hits)) hits,
+                    @(damageVisitor.ShipDamageDetails.Sum(s => s.TotalHealth) - damageVisitor.ShipDamageDetails.Sum(s => s.Hits)) misses
+                </small>
+            </div>
+
+            <h6 class="mb-2">Enemy Fleet Status</h6>
+            @foreach (var ship in damageVisitor.ShipDamageDetails)
+            {
+                var healthPercent = ship.HealthPercentage;
+                var barColor = ship.IsSunk ? "danger" : healthPercent > 50 ? "success" : healthPercent > 25 ? "warning" : "danger";
+                var statusIcon = ship.IsSunk ? "☒" : "🚢";
+
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between">
+                        <small><strong>@statusIcon @ship.ShipName</strong></small>
+                        <small class="text-muted">@ship.RemainingHealth/@ship.TotalHealth HP</small>
+                    </div>
+                    <div class="progress" style="height: 12px;">
+                        <div class="progress-bar bg-@barColor" role="progressbar"
+                             style="width: @healthPercent%"
+                             aria-valuenow="@healthPercent" aria-valuemin="0" aria-valuemax="100">
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    };
+
+    /// <summary>
+    /// Uses Visitor pattern to render battle statistics with nice formatting.
+    /// </summary>
+    private RenderFragment RenderBattleStatistics() => __builder =>
+    {
+        if (GameService.Session is null) return;
+
+        var statsVisitor = new StatisticsVisitor();
+        GameService.Session.P2.Board.Accept(statsVisitor);
+
+        <div>
+            <div class="row text-center mb-3">
+                <div class="col-6">
+                    <div class="card bg-light">
+                        <div class="card-body py-2">
+                            <h3 class="mb-0 text-success">@statsVisitor.SunkShips</h3>
+                            <small class="text-muted">Ships Sunk</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="card bg-light">
+                        <div class="card-body py-2">
+                            <h3 class="mb-0 text-primary">@statsVisitor.TotalShips</h3>
+                            <small class="text-muted">Total Ships</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h6 class="mb-2">Shot Distribution</h6>
+            <div class="mb-2">
+                <div class="d-flex justify-content-between">
+                    <small>✖ Hits</small>
+                    <small><strong>@statsVisitor.HitCells</strong></small>
+                </div>
+            </div>
+            <div class="mb-2">
+                <div class="d-flex justify-content-between">
+                    <small>• Misses</small>
+                    <small><strong>@statsVisitor.MissCells</strong></small>
+                </div>
+            </div>
+            <div class="mb-2">
+                <div class="d-flex justify-content-between">
+                    <small>☒ Sunk Cells</small>
+                    <small><strong>@statsVisitor.SunkCells</strong></small>
+                </div>
+            </div>
+
+            <hr/>
+
+            <div class="d-flex justify-content-between mb-1">
+                <small class="text-muted">Coverage</small>
+                <small><strong>@statsVisitor.CoveragePercentage.ToString("F1")%</strong></small>
+            </div>
+            <div class="d-flex justify-content-between">
+                <small class="text-muted">Board Explored</small>
+                <small><strong>@statsVisitor.ShotsFiredPercentage.ToString("F1")%</strong></small>
+            </div>
+        </div>
+    };
 }

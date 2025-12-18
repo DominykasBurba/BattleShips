@@ -9,5 +9,5 @@ public class Cell
     public IShip? Ship { get; set; }
 
     public Cell(int r, int c) => Pos = new Position(r, c);
-    public bool IsRevealed => Status is CellStatus.Hit or CellStatus.Miss or CellStatus.Sunk;
+    public bool IsRevealed => Status is CellStatus.Hit or CellStatus.Miss or CellStatus.Sunk or CellStatus.Shielded;
 }
