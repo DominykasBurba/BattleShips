@@ -10,16 +10,13 @@ namespace BattleShips.Domain.Flyweight;
 /// </summary>
 public class CellAppearanceFactory
 {
-    // Pool of shared flyweight objects
     private readonly Dictionary<string, CellAppearance> _flyweights = new();
 
-    // Singleton instance for the factory
     private static CellAppearanceFactory? _instance;
     private static readonly Lock Lock = new Lock();
 
     private CellAppearanceFactory()
     {
-        // Pre-create common flyweights to avoid repeated key lookups
         InitializeCommonFlyweights();
     }
 
@@ -36,22 +33,7 @@ public class CellAppearanceFactory
             return _instance;
         }
     }
-
-    /// <summary>
-    /// Pre-creates common cell appearances to populate the flyweight pool.
-    /// </summary>
-    private void InitializeCommonFlyweights()
-    {
-        // Create flyweights for all standard cell states
-        GetAppearance(CellStatus.Empty, false, null);
-        GetAppearance(CellStatus.Hit, false, null);
-        GetAppearance(CellStatus.Miss, false, null);
-        GetAppearance(CellStatus.Sunk, false, null);
-        GetAppearance(CellStatus.Shielded, false, null);
-        GetAppearance(CellStatus.Ship, true, null);
-        GetAppearance(CellStatus.Ship, true, ShipSkin.Camouflage);
-    }
-
+    
     /// <summary>
     /// Gets or creates a flyweight for the given cell state.
     /// Returns shared instance if already exists, creates new one otherwise.
@@ -73,6 +55,21 @@ public class CellAppearanceFactory
         return _flyweights[key];
     }
 
+    /// <summary>
+    /// Pre-creates common cell appearances to populate the flyweight pool.
+    /// </summary>
+    private void InitializeCommonFlyweights()
+    {
+        // Create flyweights for all standard cell states
+        GetAppearance(CellStatus.Empty, false, null);
+        GetAppearance(CellStatus.Hit, false, null);
+        GetAppearance(CellStatus.Miss, false, null);
+        GetAppearance(CellStatus.Sunk, false, null);
+        GetAppearance(CellStatus.Shielded, false, null);
+        GetAppearance(CellStatus.Ship, true, null);
+        GetAppearance(CellStatus.Ship, true, ShipSkin.Camouflage);
+    }
+    
     /// <summary>
     /// Computes CSS class based on cell state (same logic as BattleBoard).
     /// </summary>

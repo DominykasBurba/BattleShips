@@ -311,7 +311,29 @@ else if (GameService.Session.Phase == Phase.Playing)
         </div>
 
         <div style="text-align: center; margin-top: 1rem;">
+            <button class="btn btn-modern btn-secondary-modern me-2" @onclick="ShowBoardExport">📋 View ASCII Board</button>
             <button class="btn btn-modern btn-primary-modern" @onclick="BackToLobby">Back to Lobby</button>
+        </div>
+    }
+
+    <!-- ASCII Board Export Modal -->
+    @if (_showBoardExport)
+    {
+        <div class="modal show d-block" style="background: rgba(0,0,0,0.7);" @onclick="HideBoardExport">
+            <div class="modal-dialog modal-lg" @onclick:stopPropagation="true">
+                <div class="modal-content">
+                    <div class="modal-header bg-dark text-white">
+                        <h5 class="modal-title">📋 Final Board State (ASCII Export)</h5>
+                        <button type="button" class="btn-close btn-close-white" @onclick="HideBoardExport"></button>
+                    </div>
+                    <div class="modal-body" style="background: #1e1e1e; color: #d4d4d4;">
+                        <pre style="font-family: 'Courier New', monospace; font-size: 0.9rem; margin: 0;">@_exportedBoard</pre>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" @onclick="HideBoardExport">Close</button>
+                    </div>
+                </div>
+            </div>
         </div>
     }
 }
@@ -321,6 +343,8 @@ else if (GameService.Session.Phase == Phase.Playing)
     private bool _canStart;
     private string _startHint = "Randomize your fleet. Bot fleet is hidden.";
     private ShipKind? _selectedShip;
+    private bool _showBoardExport;
+    private string _exportedBoard = "";
 
     [Parameter]
     [SupplyParameterFromQuery(Name = "size")]
@@ -466,6 +490,27 @@ else if (GameService.Session.Phase == Phase.Playing)
     {
         GameService.ClearSession();
         Nav.NavigateTo("/");
+    }
+
+    /// <summary>
+    /// Shows the ASCII board export modal using BoardExportVisitor (Visitor pattern).
+    /// </summary>
+    private void ShowBoardExport()
+    {
+        if (GameService.Session is null) return;
+
+        var exportVisitor = new BoardExportVisitor(GameService.Session.P1.Board.Size);
+        GameService.Session.P1.Board.Accept(exportVisitor);
+        _exportedBoard = exportVisitor.ExportAsText();
+        _showBoardExport = true;
+    }
+
+    /// <summary>
+    /// Hides the ASCII board export modal.
+    /// </summary>
+    private void HideBoardExport()
+    {
+        _showBoardExport = false;
     }
 
     /// <summary>
